@@ -255,19 +255,20 @@ namespace mh
 		{
 			std::basic_string<wchar_t> operator()(const char* begin, const char* end) const
 			{
+				// wchar_t is UTF-16 on Windows and UTF-32 everywhere else, so the code
+				// unit values are identical to char16_t / char32_t. Copy element-wise
+				// rather than reinterpret_cast-ing the buffer: this is built with -flto
+				// and strict aliasing on, which is exactly where type punning between
+				// distinct types is allowed to miscompile.
 				if constexpr (sizeof(wchar_t) == 2)
 				{
 					const auto converted = change_encoding_impl<char, char16_t>{}(begin, end);
-					return std::wstring(
-						reinterpret_cast<const wchar_t*>(converted.data()),
-						converted.size());
+					return std::wstring(converted.begin(), converted.end());
 				}
 				else
 				{
 					const auto converted = change_encoding_impl<char, char32_t>{}(begin, end);
-					return std::wstring(
-						reinterpret_cast<const wchar_t*>(converted.data()),
-						converted.size());
+					return std::wstring(converted.begin(), converted.end());
 				}
 			}
 		};
@@ -276,15 +277,19 @@ namespace mh
 		{
 			std::basic_string<char> operator()(const wchar_t* begin, const wchar_t* end) const
 			{
+				// Element-wise copy, not a reinterpret_cast of the buffer -- see the note
+				// in change_encoding_impl<char, wchar_t> above.
 				if constexpr (sizeof(wchar_t) == 2)
 				{
-					const auto* p = reinterpret_cast<const char16_t*>(begin);
-					return change_encoding_impl<char16_t, char>{}(p, p + (end - begin));
+					const std::u16string converted(begin, end);
+					return change_encoding_impl<char16_t, char>{}(
+						converted.data(), converted.data() + converted.size());
 				}
 				else
 				{
-					const auto* p = reinterpret_cast<const char32_t*>(begin);
-					return change_encoding_impl<char32_t, char>{}(p, p + (end - begin));
+					const std::u32string converted(begin, end);
+					return change_encoding_impl<char32_t, char>{}(
+						converted.data(), converted.data() + converted.size());
 				}
 			}
 		};
