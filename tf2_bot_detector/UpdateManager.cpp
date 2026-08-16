@@ -142,7 +142,9 @@ namespace
 			void ClearUpdateCheck(const mh::source_location& location, UpdateStatus status, const std::string_view& msg)
 			{
 				SetUpdateStatus(location, status, msg);
-				DebugLog(MH_SOURCE_LOCATION_CURRENT()); // <- ??
+				// UpdateCheckState_t has no empty alternative, so "cleared" is a
+				// default-constructed (invalid) future -- same convention as
+				// CanReplaceUpdateCheckState().
 				m_UpdateCheckVariant.emplace<0>();
 			}
 
@@ -278,7 +280,10 @@ namespace
 			m_IsUpdateQueued = false;
 		}
 
-		if (auto future = std::get_if<std::future<BuildInfo>>(&m_State.GetUpdateCheckVariant()))
+		// valid() matters: a cleared check is an invalid future still sitting at index 0,
+		// so without this the failure path below re-fires every frame forever.
+		if (auto future = std::get_if<std::future<BuildInfo>>(&m_State.GetUpdateCheckVariant());
+			future && future->valid())
 		{
 			try
 			{
