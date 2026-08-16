@@ -45,9 +45,11 @@ else()
   		message(FATAL_ERROR "This program requires tbb 2018 or higher.")
 	endif()
 
-	# in some platforms TBB_IMPORTED_TARGETS = nothing cuz ???
+	# TBB now comes from vcpkg (see vcpkg.json), so the imported targets always exist.
+	# The old raw `-ltbb` link option was a workaround for a system TBB with no CMake
+	# config; with the vcpkg static libs it just makes ld hunt for a libtbb.so that
+	# isn't there. Do not add it back.
 	target_link_libraries(tf2_bot_detector PUBLIC TBB::tbb TBB::tbbmalloc)
-	target_link_options(tf2_bot_detector PRIVATE -ltbb)
 
 	# warnings don't exist if you pretend they don't exist
 	target_compile_options(tf2_bot_detector PRIVATE -w)
