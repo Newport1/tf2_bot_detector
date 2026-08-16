@@ -38,7 +38,10 @@
         ]
       },
       "zlib",
-      "tbb"
+      {
+        "name": "tbb",
+        "platform": "linux"
+      }
     ],
   "overrides": [
     {
