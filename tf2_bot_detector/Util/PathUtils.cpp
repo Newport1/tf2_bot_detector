@@ -23,17 +23,34 @@ using namespace std::string_literals;
 using namespace tf2_bot_detector;
 
 #ifdef _WIN32
+// On-disk game binaries. Same three names as kTF2ProcessNames: WMI
+// Win32_Process.Name is a basename and the comparison is case-insensitive,
+// so the executable list and the process list happen to coincide on Windows.
+// Keep the arrays separate anyway — they answer different questions.
 static constexpr std::string_view kTF2ExecutableNames[] = {
 	"tf_win64.exe",
 	"tf.exe",
 	"hl2.exe",
 };
+static constexpr std::string_view kTF2ProcessNames[] = {
+	"tf_win64.exe",
+	"tf.exe",
+	"hl2.exe",
+};
 #else
-// tf.sh is the current Linux launch wrapper (Settings::GetBinaryName).
-// Included so the list is strictly non-narrowing vs. every name accepted today.
+// On-disk game binaries, including tf.sh (the current Linux launch wrapper
+// used by Settings::GetBinaryName). Distinct from kTF2ProcessNames.
 static constexpr std::string_view kTF2ExecutableNames[] = {
 	"tf_linux64",
 	"tf.sh",
+	"hl2_linux",
+};
+// Live-process names only. tf.sh is a launcher shell script; the running
+// game is tf_linux64. Folding this into TF2ExecutableNames() would let
+// GetTF2CommandLineArgsAsync latch onto the wrapper pid, whose
+// /proc/<pid>/cmdline is the script rather than the game.
+static constexpr std::string_view kTF2ProcessNames[] = {
+	"tf_linux64",
 	"hl2_linux",
 };
 #endif
@@ -306,9 +323,29 @@ std::filesystem::path tf2_bot_detector::FindTFDir(const std::filesystem::path& s
 	return {};
 }
 
+std::filesystem::path tf2_bot_detector::FindSteamLinuxRuntimeSniper(const std::filesystem::path& steamDir)
+{
+	for (const auto& libraryFolder : GetSteamLibraryFolders(steamDir))
+	{
+		const auto runPath = libraryFolder / "common" / "SteamLinuxRuntime_sniper" / "run";
+		if (!IsSteamLinuxRuntimeSniperUsable(runPath))
+			continue;
+
+		return runPath;
+	}
+
+	DebugLog(MH_SOURCE_LOCATION_CURRENT(), "Failed to find SteamLinuxRuntime_sniper from {}", steamDir);
+	return {};
+}
+
 std::span<const std::string_view> tf2_bot_detector::TF2ExecutableNames()
 {
 	return kTF2ExecutableNames;
+}
+
+std::span<const std::string_view> tf2_bot_detector::TF2ProcessNames()
+{
+	return kTF2ProcessNames;
 }
 
 std::optional<std::filesystem::path> tf2_bot_detector::FindTF2Executable(const std::filesystem::path& tf_dir)

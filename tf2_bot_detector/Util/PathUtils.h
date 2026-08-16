@@ -41,9 +41,19 @@ namespace tf2_bot_detector
 	mh::generator<std::filesystem::path> GetSteamLibraryFolders(const std::filesystem::path& steamDir);
 	std::filesystem::path FindTFDir(const std::filesystem::path& steamDir);
 
+	// SteamLinuxRuntime_sniper/run across every library in libraryfolders.vdf,
+	// or empty if none is present and executable. Symmetric with FindTFDir.
+	std::filesystem::path FindSteamLinuxRuntimeSniper(const std::filesystem::path& steamDir);
+
 	// Accepted TF2 game-binary names for the current platform, most-current first.
 	// Adding a future name means editing the single array in PathUtils.cpp.
+	// Not the same list as TF2ProcessNames() — see the comments on both arrays.
 	std::span<const std::string_view> TF2ExecutableNames();
+
+	// Live-process basenames for the current platform. Distinct from
+	// TF2ExecutableNames(): on Linux the launch wrapper tf.sh is an on-disk
+	// executable but must never be treated as the running game process.
+	std::span<const std::string_view> TF2ProcessNames();
 
 	// Find the game binary next to a tf/ directory; nullopt if none present.
 	std::optional<std::filesystem::path> FindTF2Executable(const std::filesystem::path& tf_dir);
