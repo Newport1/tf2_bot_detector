@@ -617,7 +617,7 @@ void Settings::Serialize(nlohmann::json& json) const
 {
 	json =
 	{
-		{ "$schema", "https://raw.githubusercontent.com/PazerOP/tf2_bot_detector/master/schemas/v3/settings.schema.json" },
+		{ "$schema", "https://raw.githubusercontent.com/Newport1/tf2_bot_detector/custom/schemas/v3/settings.schema.json" },
 		{ "theme", m_Theme },
 		{ "general",
 			{

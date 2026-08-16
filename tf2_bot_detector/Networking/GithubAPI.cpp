@@ -31,7 +31,7 @@ namespace
 // remove?
 static mh::generator<InternalRelease> GetAllReleases(const HTTPClient& client)
 {
-	auto str = client.GetString("https://api.github.com/repos/surepy/tf2_bot_detector/releases");
+	auto str = client.GetString("https://api.github.com/repos/Newport1/tf2_bot_detector/releases");
 	if (str.empty())
 		throw std::runtime_error("Autoupdate: response string was empty");
 

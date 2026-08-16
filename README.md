@@ -16,8 +16,8 @@
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-  <a href="https://github.com/PazerOP/tf2_bot_detector">
-    <img src="https://raw.githubusercontent.com/PazerOP/tf2_bot_detector/master/tf2_bot_detector/Art/TF2BotDetector.ico" alt="Logo" width="100" height="100">
+  <a href="https://github.com/Newport1/tf2_bot_detector">
+    <img src="https://raw.githubusercontent.com/Newport1/tf2_bot_detector/custom/tf2_bot_detector/Art/TF2BotDetector.ico" alt="Logo" width="100" height="100">
   </a>
 
   <h3 align="center">TF2 Bot Detector</h3>
@@ -30,13 +30,13 @@
     <i>sleepy's personal build.</i>    
     <!-- commented until there is documentation at the wiki
     <br />
-    <a href="https://github.com/PazerOP/tf2_bot_detector/wiki"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/Newport1/tf2_bot_detector/wiki"><strong>Explore the docs »</strong></a>
     <br />
     -->
     <br />
     <a href="#installation">Install</a>
     ·
-    <a href="https://github.com/surepy/tf2_bot_detector/issues/new/choose">Report a Bug / Request a Feature</a>
+    <a href="https://github.com/Newport1/tf2_bot_detector/issues/new/choose">Report a Bug / Request a Feature</a>
     ·
     <a href="https://discord.gg/W8ZSh3Z">Join the Discord</a>
   </p>
@@ -262,19 +262,19 @@ Huge thanks to anyone who threw money at this project via GitHub Sponsors. Since
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[stars-shield]: https://img.shields.io/github/stars/PazerOP/tf2_bot_detector
-[stars-url]: https://github.com/PazerOP/tf2_bot_detector/stargazers
-[issues-shield]: https://img.shields.io/github/issues/PazerOP/tf2_bot_detector
-[issues-url]: https://github.com/surepy/tf2_bot_detector/issues
-[license-shield]: https://img.shields.io/github/license/PazerOP/tf2_bot_detector
-[license-url]: https://github.com/PazerOP/tf2_bot_detector/blob/master/LICENSE
-[actions-build-url]: https://github.com/surepy/tf2_bot_detector/actions?query=workflow%3Abuild
-[build-shield]: https://github.com/surepy/tf2_bot_detector/workflows/build/badge.svg
+[stars-shield]: https://img.shields.io/github/stars/Newport1/tf2_bot_detector
+[stars-url]: https://github.com/Newport1/tf2_bot_detector/stargazers
+[issues-shield]: https://img.shields.io/github/issues/Newport1/tf2_bot_detector
+[issues-url]: https://github.com/Newport1/tf2_bot_detector/issues
+[license-shield]: https://img.shields.io/github/license/Newport1/tf2_bot_detector
+[license-url]: https://github.com/Newport1/tf2_bot_detector/blob/custom/LICENSE
+[actions-build-url]: https://github.com/Newport1/tf2_bot_detector/actions?query=workflow%3Abuild
+[build-shield]: https://github.com/Newport1/tf2_bot_detector/workflows/build/badge.svg
 [discord-shield]: https://img.shields.io/discord/716525494421553243?label=discord&logo=discord
-[repo-link]: https://github.com/surepy/tf2_bot_detector
-[wiki-link]: https://github.com/PazerOP/tf2_bot_detector/wiki
-[issues-link]: https://github.com/surepy/tf2_bot_detector/issues
-[releases-link]: https://github.com/surepy/tf2_bot_detector/releases
+[repo-link]: https://github.com/Newport1/tf2_bot_detector
+[wiki-link]: https://github.com/Newport1/tf2_bot_detector/wiki
+[issues-link]: https://github.com/Newport1/tf2_bot_detector/issues
+[releases-link]: https://github.com/Newport1/tf2_bot_detector/releases
 [discord-link]: https://discord.gg/W8ZSh3Z
 [mscr-link]: https://aka.ms/vs/16/release/vc_redist.x64.exe
 [mscr86-link]: https://aka.ms/vs/16/release/vc_redist.x86.exe
