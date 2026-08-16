@@ -358,3 +358,10 @@ staging/cfg/addons_list.json
 /dist/
 /packaging/linux/tools/
 /packaging/linux/AppDir/
+
+# local planning / handoff / session docs - never committed
+team-ledger.md
+update_plan_aug16.md
+TF2BD_FORK_PLAN_RECONCILED.md
+HANDOFF.md
+.remember/
