@@ -10,7 +10,6 @@
 
 #include "UI/MainWindow.h"
 #include "UI/SettingsWindow.h"
-#include "UI/PlayerListManagementWindow.h"
 #include <chrono>
 
 #ifdef WIN32
@@ -136,15 +135,6 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 			});
 		}
 
-		if (false)
-		{
-			std::shared_ptr<PlayerListManagementWindow> plist = std::make_shared<PlayerListManagementWindow>();
-
-			renderer.RegisterDrawCallback([window = std::move(plist)]() {
-				window->Draw();
-			});
-		}
-
 		std::chrono::milliseconds last_update;
 		auto now_milis = []() {
 			return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -178,7 +168,9 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 
 #ifdef WIN32
 /// <summary>
-/// workaround so pazer's SmartScreen-signed exe works, calls the other windows-specific RunProgram().
+/// WinMain-signature export. Forwards to the argument-less RunProgram(),
+/// which parses the process command line and calls RunProgram(argc, argv).
+/// Must stay: the shipped Windows exe entry point calls this signature.
 /// </summary>
 /// <param name="hInstance">unused</param>
 /// <param name="hPrevInstance">unused</param>

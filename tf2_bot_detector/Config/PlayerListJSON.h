@@ -223,8 +223,6 @@ namespace tf2_bot_detector
 	public:
 		// this seems like a bad idea, idk why.
 		ConfigFileGroup& GetConfigFileGroup() { return m_CFGGroup; }
-
-		friend class PlayerListManagementWindow;
 	};
 
 	std::string to_string(const PlayerAttribute& d);

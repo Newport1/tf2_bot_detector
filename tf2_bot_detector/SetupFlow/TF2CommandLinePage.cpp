@@ -268,7 +268,7 @@ static std::optional<std::string> OpenTF2(const Settings& settings, const std::s
 #ifdef __linux__
 	// we have to run w/ sniper runtime lib apparently.
 	// "TF2 requires the sniper container runtime" - tf.sh
-	const std::filesystem::path runtime_sniper = settings.GetSteamDir()/"steamapps"/"common"/"SteamLinuxRuntime_sniper"/"run";
+	const std::filesystem::path runtime_sniper = FindSteamLinuxRuntimeSniper(settings.GetSteamDir());
 
 	if (!IsSteamLinuxRuntimeSniperUsable(runtime_sniper))
 	{

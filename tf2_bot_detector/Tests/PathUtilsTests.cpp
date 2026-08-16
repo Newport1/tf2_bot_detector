@@ -341,3 +341,62 @@ TEST_CASE("IsSteamLinuxRuntimeSniperUsable", "[tf2bd][pathutils]")
 #endif
 	REQUIRE(IsSteamLinuxRuntimeSniperUsable(missing));
 }
+
+static void WriteLibraryFoldersVdf(const std::filesystem::path& steamDir,
+	const std::filesystem::path& defaultLib,
+	const std::filesystem::path& secondLib)
+{
+	std::filesystem::create_directories(steamDir / "steamapps");
+	std::ofstream out(steamDir / "steamapps" / "libraryfolders.vdf");
+	REQUIRE(out.good());
+	out << "\"libraryfolders\"\n{\n"
+		<< "\t\"0\"\n\t{\n\t\t\"path\"\t\t\"" << defaultLib.generic_string() << "\"\n\t}\n"
+		<< "\t\"1\"\n\t{\n\t\t\"path\"\t\t\"" << secondLib.generic_string() << "\"\n\t}\n"
+		<< "}\n";
+}
+
+TEST_CASE("FindSteamLinuxRuntimeSniper - second library only", "[tf2bd][pathutils]")
+{
+	TempDir tmp;
+	const auto steamDir = tmp.path() / "steam";
+	const auto secondLib = tmp.path() / "second_library";
+	WriteLibraryFoldersVdf(steamDir, steamDir, secondLib);
+
+	const auto runPath = secondLib / "steamapps" / "common" / "SteamLinuxRuntime_sniper" / "run";
+	WriteEmptyFile(runPath);
+#ifndef _WIN32
+	REQUIRE(::chmod(runPath.c_str(), 0755) == 0);
+#endif
+
+	// Default library has steamapps but no sniper; only the second library does.
+	const auto found = FindSteamLinuxRuntimeSniper(steamDir);
+	REQUIRE_FALSE(found.empty());
+	REQUIRE(Normalized(found) == Normalized(runPath));
+}
+
+TEST_CASE("FindSteamLinuxRuntimeSniper - absent everywhere returns empty", "[tf2bd][pathutils]")
+{
+	TempDir tmp;
+	const auto steamDir = tmp.path() / "steam";
+	const auto secondLib = tmp.path() / "second_library";
+	WriteLibraryFoldersVdf(steamDir, steamDir, secondLib);
+	std::filesystem::create_directories(secondLib / "steamapps" / "common");
+
+	REQUIRE(FindSteamLinuxRuntimeSniper(steamDir).empty());
+}
+
+TEST_CASE("TF2ProcessNames is not TF2ExecutableNames", "[tf2bd][pathutils]")
+{
+	const auto procs = TF2ProcessNames();
+	REQUIRE_FALSE(procs.empty());
+
+	const bool hasTfSh = std::any_of(procs.begin(), procs.end(),
+		[](std::string_view n) { return n == "tf.sh"; });
+	REQUIRE_FALSE(hasTfSh);
+
+#ifdef _WIN32
+	const auto exes = TF2ExecutableNames();
+	REQUIRE(procs.size() == exes.size());
+	REQUIRE(std::equal(procs.begin(), procs.end(), exes.begin()));
+#endif
+}

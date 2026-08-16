@@ -1,4 +1,5 @@
 #include "../Platform.h"
+#include "Util/PathUtils.h"
 #include "Util/TextUtils.h"
 #include "Log.h"
 
@@ -27,12 +28,17 @@
 
 #include "LinuxHelpers.h"
 
-// TODO: 64bit binaries
 bool tf2_bot_detector::Processes::IsTF2Running()
 {
-	static mh::cached_variable hl2_exe(std::chrono::seconds(2), []() { return IsProcessRunning("hl2_linux"); });
-	static mh::cached_variable tf64_exe(std::chrono::seconds(2), []() { return IsProcessRunning("tf_linux64"); });   
-	return tf64_exe.get() || hl2_exe.get();
+	static mh::cached_variable cached(std::chrono::seconds(2), []() {
+		for (const auto name : TF2ProcessNames())
+		{
+			if (IsProcessRunning(name))
+				return true;
+		}
+		return false;
+	});
+	return cached.get();
 }
 
 bool tf2_bot_detector::Processes::IsSteamRunning()
@@ -104,12 +110,12 @@ mh::task<std::vector<std::string>> tf2_bot_detector::Processes::GetTF2CommandLin
 {
     pid_t tf2_pid = 0;
 
-    if (Linux::processPids.contains("hl2_linux")) {
-        tf2_pid = Linux::processPids.at("hl2_linux");
-    }
-    
-    if (!tf2_pid && Linux::processPids.contains("tf_linux64")) {
-        tf2_pid = Linux::processPids.at("tf_linux64");
+    for (const auto name : TF2ProcessNames()) {
+        if (Linux::processPids.contains(name)) {
+            tf2_pid = Linux::processPids.at(name);
+            if (tf2_pid)
+                break;
+        }
     }
 
     if (!tf2_pid) {
