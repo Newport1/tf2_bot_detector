@@ -272,13 +272,20 @@ static std::optional<std::string> OpenTF2(const Settings& settings, const std::s
 
 	if (!IsSteamLinuxRuntimeSniperUsable(runtime_sniper))
 	{
+		// FindSteamLinuxRuntimeSniper returns empty when it searched every library and
+		// found nothing, so "{}" would render as an empty path and tell the user
+		// nothing. Say where we looked instead.
+		auto where = runtime_sniper.empty()
+			? fmt::format("in any Steam library under {}", settings.GetSteamDir())
+			: fmt::format("at {}", runtime_sniper);
+
 		auto msg = fmt::format(
 			"TF2 requires the \"Steam Linux Runtime 3.0 (sniper)\" to launch, "
-			"but it was not found or is not executable at {}. "
+			"but it was not found or is not executable {}. "
 			"Steam installs it automatically as a TF2 dependency — open Steam, "
 			"install or update Team Fortress 2, and ensure "
 			"\"Steam Linux Runtime 3.0 (sniper)\" is installed.",
-			runtime_sniper);
+			where);
 		LogError("{}", msg);
 		return msg;
 	}
