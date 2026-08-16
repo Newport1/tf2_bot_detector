@@ -124,7 +124,6 @@ namespace
 				decltype(std::declval<State_t>().emplace<T>(std::move(args)...), void())
 			{
 				SetUpdateStatus(location, status, std::move(msg));
-				DebugLog(__FUNCSIG__);
 				m_Variant.emplace<T>(std::move(args)...);
 			}
 
@@ -152,7 +151,6 @@ namespace
 			void SetUpdateCheck(const mh::source_location& location, UpdateStatus status, const std::string_view& msg, T value)
 			{
 				SetUpdateStatus(location, status, msg);
-				DebugLog(__FUNCSIG__);
 				m_UpdateCheckVariant.emplace<T>(std::forward<T>(value));
 			}
 
@@ -209,7 +207,6 @@ namespace
 				{
 					auto value = future->get().value();
 					SetUpdateStatus(MH_SOURCE_LOCATION_CURRENT(), success, std::string(successMsg));
-					DebugLog(MH_SOURCE_LOCATION_CURRENT());
 					variant.template emplace<TFutureResult>(std::move(value));
 				}
 			}
