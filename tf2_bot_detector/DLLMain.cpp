@@ -18,8 +18,6 @@
 #include <Windows.h>
 #include <Objbase.h>
 #include <shellapi.h>
-
-#include "d3d9.h"
 #else 
 // Why do they keep deprecating simple functions for complicated functions. 
 // Instead of busting your brains on nanosecond() might as well use usleep for the time being. 
