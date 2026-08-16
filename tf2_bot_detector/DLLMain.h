@@ -15,9 +15,5 @@ namespace tf2_bot_detector
 #ifdef WIN32
 	TF2_BOT_DETECTOR_EXPORT int RunProgram(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow);
 	TF2_BOT_DETECTOR_EXPORT int RunProgram();
-
-#ifdef TF2BD_OVERLAY_BUILD
-	void RunProgramOverlay(HMODULE module);
-#endif
 #endif
 }

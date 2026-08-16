@@ -35,8 +35,6 @@ if(NOT imgui_USE_MULTI_VIEWPORTS)
 	target_compile_definitions(tf2_bot_detector_renderer PUBLIC TF2BD_IMGUI_NO_MUTLI_VIEWPORTS)
 endif()
 
-# option(TF2BD_IS_OVERLAY "compile this as an overlay." off)
-
 # imgui options ig
 option(imgui_USE_OPENGL2 "Includes the OpenGL2 implementation." off)
 option(imgui_USE_OPENGL3 "Includes the OpenGL3 implementation." on)
