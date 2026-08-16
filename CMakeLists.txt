@@ -10,6 +10,10 @@ set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/submodules/vcpkg/scripts/b
 option(TF2BD_ENABLE_DISCORD_INTEGRATION "Enable discord integration" off)
 option(TF2BD_ENABLE_TESTS "Enable test compilation" off)
 
+if (TF2BD_ENABLE_TESTS)
+	enable_testing()
+endif()
+
 include(cmake/init-preproject.cmake)
 	project(tf2_bot_detector)
 include(cmake/init-postproject.cmake)

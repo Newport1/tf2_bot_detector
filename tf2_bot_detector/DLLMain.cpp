@@ -87,16 +87,16 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 			if (!strcmp(argv[i], "-forward") && (i + 1) < argc) {
 				forwarded_arg = argv[i + 1];
 			}
+#ifdef TF2BD_ENABLE_TESTS
+			if (!strcmp(argv[i], "--run-tests"))
+				return tf2_bot_detector::RunTests();
+#endif
 #ifdef _DEBUG
 			if (!strcmp(argv[i], "--static-seed") && (i + 1) < argc)
 				tf2_bot_detector::g_StaticRandomSeed = atoi(argv[i + 1]);
 			else if (!strcmp(argv[i], "--run-tests"))
 			{
-#ifdef TF2BD_ENABLE_TESTS
-				return tf2_bot_detector::RunTests();
-#else
 				LogError("--run-tests was on the command line, but tests were not compiled in");
-#endif
 			}
 #endif
 		}
