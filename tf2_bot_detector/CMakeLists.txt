@@ -445,6 +445,7 @@ if (TF2BD_ENABLE_TESTS)
 		"Tests/HumanDurationTests.cpp"
 		"Tests/PathUtilsTests.cpp"
 		"Tests/PlayerRuleTests.cpp"
+		"Tests/RealSteamInstallTests.cpp"
 		"Tests/ShellTests.cpp"
 		"Tests/Tests.h"
 	)

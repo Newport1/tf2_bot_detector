@@ -89,7 +89,10 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 			}
 #ifdef TF2BD_ENABLE_TESTS
 			if (!strcmp(argv[i], "--run-tests"))
-				return tf2_bot_detector::RunTests();
+			{
+				// forward everything after --run-tests to Catch2 for test selection
+				return tf2_bot_detector::RunTests(argc - (i + 1), argv + (i + 1));
+			}
 #endif
 #ifdef _DEBUG
 			if (!strcmp(argv[i], "--static-seed") && (i + 1) < argc)
