@@ -86,6 +86,7 @@ namespace tf2_bot_detector
 			uint16_t m_RandomRCONPort;
 			bool m_RCONSuccess = false;
 			std::optional<RCONClientData> m_TestRCONClient;
+			std::string m_LaunchError;
 
 			void TryUpdateCmdlineArgs();
 
