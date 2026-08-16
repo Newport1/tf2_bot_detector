@@ -17,7 +17,16 @@ defaults:
     shell: bash
 
 jobs:
+  safety-boundary:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Check safety boundary
+      run: bash scripts/check-safety-boundary.sh
+
   config:
+    needs: safety-boundary
     runs-on: windows-2022
     outputs:
       tf2bd_version: ${{ steps.tf2bd_version.outputs.value }}
