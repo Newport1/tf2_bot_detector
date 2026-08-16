@@ -53,11 +53,13 @@ BaseTextures::BaseTextures(ITextureManager& textureManager) :
 
 std::shared_ptr<ITexture> BaseTextures::TryLoadTexture(std::filesystem::path file) const
 {
-	file = IFilesystem::Get().ResolvePath(file, PathUsage::Read);
+	// Keep `file` for the error message: ResolvePath returns an empty path when it
+	// finds nothing, so reusing it there logs "Failed to load :" and names nothing.
+	const std::filesystem::path resolved = IFilesystem::Get().ResolvePath(file, PathUsage::Read);
 
 	try
 	{
-		return m_TextureManager.CreateTexture(Bitmap(file));
+		return m_TextureManager.CreateTexture(Bitmap(resolved));
 	}
 	catch (const std::exception& e)
 	{
