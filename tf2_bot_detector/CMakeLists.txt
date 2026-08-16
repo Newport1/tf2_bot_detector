@@ -67,7 +67,22 @@ else()
 		"Launcher/main.cpp"
 	)
 	target_include_directories(tf2_bot_detector_launcher PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-	# --whole-archive keeps Catch2 TEST_CASE registrars in unreferenced TUs.
+	# DO NOT REMOVE --whole-archive. It is load-bearing for the APPLICATION, not
+	# just for tests.
+	#
+	# Every ConsoleLog/ConsoleLines/*.cpp translation unit registers its line type
+	# at static-init time through ConsoleLineBase::AutoRegister (IConsoleLine.h).
+	# Nothing ever references those TUs by symbol. Back when this target was an
+	# add_executable the objects were linked in directly, so the registrars always
+	# ran. Now that the app is a STATIC archive, a normal link discards every
+	# object file with no referenced symbol -- the binary still builds and starts,
+	# but IConsoleLine::ParseConsoleLine silently stops recognising most console
+	# lines and the scoreboard just never populates. The __attribute__((used)) on
+	# AutoRegister stops the *compiler* dropping it; it does not stop the *linker*
+	# dropping the whole object out of the archive.
+	#
+	# It also happens to keep Catch2 TEST_CASE registrars, which is why the same
+	# flag is on tf2_bot_detector_cli.
 	target_link_libraries(tf2_bot_detector_launcher PRIVATE
 		-Wl,--whole-archive tf2_bot_detector -Wl,--no-whole-archive
 		mh::stuff)
