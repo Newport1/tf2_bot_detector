@@ -443,7 +443,9 @@ if (TF2BD_ENABLE_TESTS)
 		"Tests/ConsoleLineTests.cpp"
 		"Tests/FormattingTests.cpp"
 		"Tests/HumanDurationTests.cpp"
+		"Tests/PathUtilsTests.cpp"
 		"Tests/PlayerRuleTests.cpp"
+		"Tests/ShellTests.cpp"
 		"Tests/Tests.h"
 	)
 

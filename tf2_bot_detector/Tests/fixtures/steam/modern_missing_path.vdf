@@ -1,0 +1,14 @@
+"libraryfolders"
+{
+	"0"
+	{
+		"path"		"/tmp/tf2bd-test-default-steam"
+		"label"		""
+	}
+	"1"
+	{
+		"label"		"broken-no-path"
+		"contentid"		"1"
+		"totalsize"		"0"
+	}
+}
