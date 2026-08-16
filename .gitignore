@@ -340,6 +340,7 @@ ASALocalRun/
 healthchecksdb
 tf2_bot_detector/imgui.ini
 build/
+other_repos/
 CMakeFiles/
 .vscode/
 staging/cfg/settings.json
