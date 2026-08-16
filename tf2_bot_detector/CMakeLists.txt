@@ -441,6 +441,7 @@ if (TF2BD_ENABLE_TESTS)
 	target_sources(tf2_bot_detector PRIVATE
 		"Tests/Catch2.cpp"
 		"Tests/ConsoleLineTests.cpp"
+		"Tests/EncodingTests.cpp"
 		"Tests/FormattingTests.cpp"
 		"Tests/HumanDurationTests.cpp"
 		"Tests/PathUtilsTests.cpp"
