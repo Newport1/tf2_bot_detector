@@ -11,11 +11,20 @@ cd "$(dirname "$0")/.."
 # real code looks like (/proc/self/mem, /proc/%d/mem) plus the actual syscalls.
 pattern='ReadProcessMemory|WriteProcessMemory|VirtualAllocEx|CreateRemoteThread|SetWindowsHookEx|MinHook|PolyHook|ptrace|PTRACE_|process_vm_readv|process_vm_writev|/proc/[^ "]*/mem|LD_PRELOAD|SendInput|keybd_event|TF2BD_OVERLAY_BUILD|RunProgramOverlay|-insecure'
 
-if grep -rnE --exclude-dir=submodules --exclude-dir=other_repos --exclude-dir=build \
+# A line tagged "safety-boundary-allow" is exempt. This exists for exactly one
+# case: TF2BD must never *add* -insecure, but it does have to *detect* that the
+# user already put it in their own Steam launch options, so it can avoid
+# appending -secure and silently overriding them. Detection is not emission.
+# The tag is deliberately greppable -- review every hit before adding one.
+hits=$(grep -rnE --exclude-dir=submodules --exclude-dir=other_repos --exclude-dir=build \
 	--exclude='check-safety-boundary.sh' \
 	"$pattern" \
-	tf2_bot_detector tf2_bot_detector_common tf2_bot_detector_renderer
+	tf2_bot_detector tf2_bot_detector_common tf2_bot_detector_renderer \
+	| grep -v 'safety-boundary-allow' || true)
+
+if [ -n "$hits" ]
 then
+	printf '%s\n' "$hits"
 	exit 1
 fi
 

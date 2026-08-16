@@ -400,3 +400,36 @@ TEST_CASE("TF2ProcessNames is not TF2ExecutableNames", "[tf2bd][pathutils]")
 	REQUIRE(std::equal(procs.begin(), procs.end(), exes.begin()));
 #endif
 }
+
+// safety-boundary-allow: asserts TF2BD does NOT override a user who asked for
+// insecure. The flag appears here only as test input, never as something we emit.
+TEST_CASE("PlanTF2LaunchArgs - asks for -secure by default", "[tf2bd][pathutils]")
+{
+	const auto plan = tf2_bot_detector::PlanTF2LaunchArgs("-novid", "pw", 40434, false);
+
+	REQUIRE(plan.action == tf2_bot_detector::TF2LaunchArgsAction::LaunchAsIs);
+	REQUIRE(plan.args.find("-secure") != std::string::npos);
+}
+
+// safety-boundary-allow: see above.
+TEST_CASE("PlanTF2LaunchArgs - user's -insecure is not overridden", "[tf2bd][pathutils]") // safety-boundary-allow
+{
+	const auto plan = tf2_bot_detector::PlanTF2LaunchArgs("-novid -insecure", "pw", 40434, false); // safety-boundary-allow
+
+	REQUIRE(plan.action == tf2_bot_detector::TF2LaunchArgsAction::LaunchAsIs);
+	// The user's own flag survives, and we must not append a contradicting -secure.
+	REQUIRE(plan.args.find("-insecure") != std::string::npos); // safety-boundary-allow
+	REQUIRE(plan.args.find("-secure") == std::string::npos);
+	// Everything else TF2BD needs is still there.
+	REQUIRE(plan.args.find("-usercon") != std::string::npos);
+	REQUIRE(plan.args.find("-condebug") != std::string::npos);
+}
+
+// safety-boundary-allow: see above.
+TEST_CASE("PlanTF2LaunchArgs - substring is not mistaken for the flag", "[tf2bd][pathutils]")
+{
+	// "-insecurely" is not "-insecure", so -secure must still be requested. // safety-boundary-allow
+	const auto plan = tf2_bot_detector::PlanTF2LaunchArgs("-insecurely", "pw", 40434, false); // safety-boundary-allow
+
+	REQUIRE(plan.args.find("-secure") != std::string::npos);
+}

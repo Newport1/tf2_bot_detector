@@ -405,12 +405,38 @@ std::filesystem::path tf2_bot_detector::DiscoverSteamDir(
 	return {};
 }
 
-static std::string BuildTF2RequiredLaunchArgs(std::string_view rconPassword, uint16_t rconPort)
+// Detection only. TF2BD never adds this flag -- it is matched solely to notice
+// that the *user* already put it in their own Steam launch options, so we don't
+// contradict them by appending -secure afterwards.
+static constexpr std::string_view kUserInsecureFlag = "-insecure"; // safety-boundary-allow
+
+// Whole-token search, so a longer token or a path containing the text doesn't match.
+static bool HasWholeFlag(std::string_view args, std::string_view flag)
 {
+	const auto isSep = [](char c) { return c == ' ' || c == '\t'; };
+
+	for (size_t pos = args.find(flag); pos != std::string_view::npos; pos = args.find(flag, pos + flag.size()))
+	{
+		const size_t end = pos + flag.size();
+		if ((pos == 0 || isSep(args[pos - 1])) && (end == args.size() || isSep(args[end])))
+			return true;
+	}
+
+	return false;
+}
+
+static std::string BuildTF2RequiredLaunchArgs(std::string_view rconPassword, uint16_t rconPort,
+	bool userDisabledVAC)
+{
+	// TF2BD asks for -secure by default, but the user's own launch options win.
+	// Appending -secure after their explicit opt-out would silently override a
+	// deliberate choice on their own machine.
+	const std::string_view secureArg = userDisabledVAC ? " -steam" : " -steam -secure";
+
 	return fmt::format(
 		" bd"
 		" -game tf"
-		" -steam -secure"
+		"{}"
 		" -usercon"
 		" +developer 1"
 		" +ip 0.0.0.0"
@@ -422,7 +448,7 @@ static std::string BuildTF2RequiredLaunchArgs(std::string_view rconPassword, uin
 		" +con_timestamp 1"
 		" -condebug"
 		" -conclearlog",
-		rconPassword, rconPort);
+		secureArg, rconPassword, rconPort);
 }
 
 TF2LaunchArgsPlan tf2_bot_detector::PlanTF2LaunchArgs(
@@ -432,7 +458,8 @@ TF2LaunchArgsPlan tf2_bot_detector::PlanTF2LaunchArgs(
 	bool useRecommendedParams)
 {
 	const std::string originalUserArgs = userArgs;
-	userArgs += BuildTF2RequiredLaunchArgs(rconPassword, rconPort);
+	const bool userDisabledVAC = HasWholeFlag(originalUserArgs, kUserInsecureFlag);
+	userArgs += BuildTF2RequiredLaunchArgs(rconPassword, rconPort, userDisabledVAC);
 
 	TF2LaunchArgsPlan plan;
 	plan.limit = kTF2LaunchArgsHardLimit;
