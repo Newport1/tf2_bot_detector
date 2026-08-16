@@ -26,6 +26,14 @@ namespace
 		const auto asU16 = mh::change_encoding<char16_t>(asChar);
 		const auto backToChar = mh::change_encoding<char>(std::u16string_view(asU16));
 		REQUIRE(backToChar == asChar);
+
+		// The wchar_t pair is what DLLMain.cpp:208 uses on Windows (via ToMB), and
+		// it is the only conversion whose implementation differs by platform --
+		// UTF-16 there, UTF-32 here. Exercise it directly so the wchar_t branch is
+		// not covered only by the char16_t stand-in above.
+		const auto asWide = mh::change_encoding<wchar_t>(asChar);
+		const auto backFromWide = mh::change_encoding<char>(std::wstring_view(asWide));
+		REQUIRE(backFromWide == asChar);
 	}
 }
 
