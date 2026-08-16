@@ -24,7 +24,6 @@ public:
 
 	/// <summary>
 	/// ImGui::Render() related functions.
-	/// in overlay this would be somewhere in EndScene.
 	/// </summary>
 	void DrawFrame();
 
@@ -48,8 +47,6 @@ public:
 
 	/// <summary>
 	/// how frequent should DrawFrame run?
-	///
-	/// note: ignored in overlay mode.
 	/// </summary>
 	/// <param name="frameTime">frame time in ms</param>
 	void SetFramerate(float);

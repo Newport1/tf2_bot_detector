@@ -253,8 +253,6 @@ target_sources(tf2_bot_detector PRIVATE
 	"UI/MainWindow.Scoreboard.cpp"
 	"UI/SettingsWindow.cpp"
 	"UI/SettingsWindow.h"
-	"UI/PlayerListManagementWindow.cpp"
-	"UI/PlayerListManagementWindow.h"
 	"Util/JSONUtils.h"
 	"Util/PathUtils.cpp"
 	"Util/PathUtils.h"

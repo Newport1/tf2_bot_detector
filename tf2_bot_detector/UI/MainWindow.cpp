@@ -769,8 +769,6 @@ void MainWindow::OnDrawMenuBar()
 
 	if (!isInSetupFlow || m_Application->m_SetupFlow.GetCurrentPage() == SetupFlowPage::TF2CommandLine)
 	{
-		//if (ImGui::MenuItem("PlayerList")) {}
-
 		if (ImGui::MenuItem("Settings")) {
 			ToggleSettingsPopup();
 		}
