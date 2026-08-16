@@ -18,8 +18,6 @@
 #include <Windows.h>
 #include <Objbase.h>
 #include <shellapi.h>
-
-#include "d3d9.h"
 #else 
 // Why do they keep deprecating simple functions for complicated functions. 
 // Instead of busting your brains on nanosecond() might as well use usleep for the time being. 
@@ -112,7 +110,6 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 		tf2_bot_detector::RunTests();
 #endif
 
-#ifndef TF2BD_OVERLAY_BUILD
 		DebugLog("Initializing TF2BDApplication...");
 		TF2BDRenderer renderer;
 
@@ -168,7 +165,6 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 
 			renderer.DrawFrame();
 		}
-#endif
 	}
 
 	ILogManager::GetInstance().CleanupEmptyLogs();

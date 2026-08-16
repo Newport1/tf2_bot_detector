@@ -17,7 +17,16 @@ defaults:
     shell: bash
 
 jobs:
+  safety-boundary:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Check safety boundary
+      run: bash scripts/check-safety-boundary.sh
+
   config:
+    needs: safety-boundary
     runs-on: windows-2022
     outputs:
       tf2bd_version: ${{ steps.tf2bd_version.outputs.value }}
@@ -130,7 +139,7 @@ jobs:
       if: steps.determine_artifact_behavior.outputs.upload && startsWith(matrix.os, 'windows')
       uses: actions/upload-artifact@v4
       with:
-        name: "smartscreen_${{ matrix.triplet }}_${{ needs.config.outputs.tf2bd_version }}_${{ matrix.build_type }}"
+        name: "tf2_bot_detector_${{ matrix.triplet }}_${{ needs.config.outputs.tf2bd_version }}_${{ matrix.build_type }}"
         if-no-files-found: error
         path: "${{ needs.config.outputs.tf2bd_build_dir }}/*.exe"
 
@@ -139,13 +148,6 @@ jobs:
       run: |
         echo "Copying build artifacts to staging..."
         cp -v ${{ needs.config.outputs.tf2bd_build_dir }}/*.exe ${{ needs.config.outputs.tf2bd_build_dir }}/*.dll ${{ needs.config.outputs.tf2bd_workspace }}/staging/
-
-        echo "Performing smartscreen workaround..."
-        echo "Hash of current exe: "
-        sha1sum "${{ needs.config.outputs.tf2bd_workspace }}/staging/tf2_bot_detector.exe"
-        cp -v "${{ needs.config.outputs.tf2bd_workspace }}/smartscreen/${{ matrix.tf2bd_arch }}/tf2_bot_detector.exe" "${{ needs.config.outputs.tf2bd_workspace }}/staging/tf2_bot_detector.exe"
-        echo "Hash of cached exe: "
-        sha1sum "${{ needs.config.outputs.tf2bd_workspace }}/staging/tf2_bot_detector.exe"
 
     - name: "Artifacts: Upload staging/"
       if: steps.determine_artifact_behavior.outputs.upload && startsWith(matrix.os, 'windows')
