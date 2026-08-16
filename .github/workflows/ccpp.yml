@@ -1,12 +1,12 @@
 name: build
 
+# Manual dispatch only. Push-triggered builds on a private repo burn billable
+# Actions minutes on every commit (Windows runners bill at 2x), which is real money
+# for a fork nobody is releasing from yet. Run the same gates locally instead:
+#   scripts/ci-local.sh
+# Re-add a `push:` trigger here when this fork actually ships releases.
 on:
-  push:
-    paths-ignore:
-      - 'schemas/**.json'
-      - 'staging/cfg/**.json'
-      - '*.md'
-      - '*.appinstaller_template'
+  workflow_dispatch:
 
 env:
   VCPKG_ROOT: ${{ github.workspace }}/submodules/vcpkg
