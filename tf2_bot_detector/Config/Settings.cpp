@@ -258,31 +258,51 @@ bool Settings::IsSteamAPIAvailable() const
 #ifdef _WIN32
 std::string GeneralSettings::GetBinaryName() const
 {
-	switch (m_TFBinaryMode) {
-	case TFBinaryMode::x64:
-		return "tf_win64.exe";
-	case TFBinaryMode::x86:
-		return "tf.exe";
-	case TFBinaryMode::x86_legacy:
-		return "hl2.exe";
+	const auto names = TF2ExecutableNames();
+	auto pick = [&](std::string_view want) -> std::string
+	{
+		for (const auto name : names)
+		{
+			if (name == want)
+				return std::string(name);
+		}
+		return std::string(names.front());
 	};
 
-	// it might be probably better to error out?
-	return "tf_win64.exe";
+	switch (m_TFBinaryMode) {
+	case TFBinaryMode::x64:
+		return pick("tf_win64.exe");
+	case TFBinaryMode::x86:
+		return pick("tf.exe");
+	case TFBinaryMode::x86_legacy:
+		return pick("hl2.exe");
+	};
+
+	return pick("tf_win64.exe");
 }
 #else
 std::string GeneralSettings::GetBinaryName() const
 {
+	const auto names = TF2ExecutableNames();
+	auto pick = [&](std::string_view want) -> std::string
+	{
+		for (const auto name : names)
+		{
+			if (name == want)
+				return std::string(name);
+		}
+		return std::string(names.front());
+	};
+
 	switch (m_TFBinaryMode) {
 	case TFBinaryMode::x64:
 	case TFBinaryMode::x86: // ignored in linux
-		return "tf.sh";
+		return pick("tf.sh");
 	case TFBinaryMode::x86_legacy:
-		return "hl2_linux";
+		return pick("hl2_linux");
 	};
 
-	// it might be probably better to error out?
-	return "tf.sh";
+	return pick("tf.sh");
 }
 #endif
 
