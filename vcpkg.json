@@ -2,47 +2,52 @@
   "name": "tf2-bot-detector",
   "version-string": "",
   "dependencies": [
-    "sdl2",
-    {
-      "name": "sdl2",
-      "features": [ "wayland", "x11", "vulkan" ],
-      "platform": "linux"
-    },
-    "cryptopp",
-    {
-      "name": "libzippp",
-      "version>=": "6.1-1.9.2"
-    },
-    {
-      "name": "fmt",
-      "version>=": "10.2.1"
-    },
-    {
-      "name": "discord-game-sdk",
-      "platform": "!static"
-    },
-    {
-      "name": "stb",
-      "version>=": "2023-04-11#1"
-    },
-    "nlohmann-json",
-    {
-		  "name": "catch2",
-		  "version>=": "3.3.0"
-    },
-    "sqlitecpp",
-    {
-      "name": "cpprestsdk",
-      "features": [
-        "compression"
-      ]
-    },
-    "zlib"
-  ],
+      "sdl2",
+      {
+        "name": "sdl2",
+        "features": [ "wayland", "x11", "vulkan" ],
+        "platform": "linux"
+      },
+      "cryptopp",
+      {
+        "name": "libzippp",
+        "version>=": "6.1-1.9.2"
+      },
+      {
+        "name": "fmt",
+        "version>=": "10.2.1"
+      },
+      {
+        "name": "discord-game-sdk",
+        "platform": "!static"
+      },
+      {
+        "name": "stb",
+        "version>=": "2023-04-11#1"
+      },
+      "nlohmann-json",
+      {
+        "name": "catch2",
+        "version>=": "3.3.0"
+      },
+      "sqlitecpp",
+      {
+        "name": "cpprestsdk",
+        "features": [
+          "compression"
+        ]
+      },
+      "zlib",
+      "tbb"
+    ],
   "overrides": [
     {
       "name": "fmt",
       "version": "10.2.1"
+    },
+    {
+      "name": "tbb",
+      "version": "2021.5.0"
     }
   ],
   "builtin-baseline": "253704407ae68efa37bf8f5b59b3e06dd40d3d3f"
