@@ -11,6 +11,8 @@
 
 #include <filesystem>
 #include <memory>
+#include <string>
+#include <vector>
 
 
 /// @brief opens anything with xdg-open
@@ -21,16 +23,111 @@ void xdg_open(const char* url)
     system(fmt::format("xdg-open {}", url).c_str());
 }
 
-// we don't need to do wchar... stuff, i think.
+// Unix-style tokenizer. string_view::data() is not NUL-terminated, so we copy first.
+// Windows SplitCommandLineArgs correctly defers to CommandLineToArgvW and is left alone.
 std::vector<std::string> tf2_bot_detector::Shell::SplitCommandLineArgs(const std::string_view& cmdline)
 {
-    std::istringstream ss(cmdline.data());
-    std::string token;
-    std::vector<std::string> tokens;
+	const std::string input(cmdline);
+	std::vector<std::string> tokens;
+	std::string current;
 
-    while (std::getline(ss, token, ' ')) {
-        tokens.push_back(token);
-    }
+	enum class State { Normal, InDouble, InSingle };
+	State state = State::Normal;
+	bool inToken = false;
+
+	const auto isSeparator = [](char c) { return c == ' ' || c == '\t'; };
+
+	for (size_t i = 0; i < input.size(); ++i)
+	{
+		const char c = input[i];
+
+		if (state == State::Normal)
+		{
+			if (c == '\\' && i + 1 < input.size())
+			{
+				const char next = input[i + 1];
+				if (next == '"' || next == '\'' || next == '\\' || isSeparator(next))
+				{
+					current.push_back(next);
+					inToken = true;
+					++i;
+					continue;
+				}
+			}
+
+			if (c == '"')
+			{
+				state = State::InDouble;
+				inToken = true; // "" is one empty token
+				continue;
+			}
+			if (c == '\'')
+			{
+				state = State::InSingle;
+				inToken = true;
+				continue;
+			}
+			if (isSeparator(c))
+			{
+				if (inToken)
+				{
+					tokens.push_back(std::move(current));
+					current.clear();
+					inToken = false;
+				}
+				continue;
+			}
+
+			current.push_back(c);
+			inToken = true;
+			continue;
+		}
+
+		if (state == State::InDouble)
+		{
+			if (c == '\\' && i + 1 < input.size())
+			{
+				const char next = input[i + 1];
+				if (next == '"' || next == '\\' || isSeparator(next))
+				{
+					current.push_back(next);
+					++i;
+					continue;
+				}
+			}
+			if (c == '"')
+			{
+				state = State::Normal;
+				continue;
+			}
+			current.push_back(c);
+			continue;
+		}
+
+		// InSingle
+		if (c == '\\' && i + 1 < input.size())
+		{
+			const char next = input[i + 1];
+			if (next == '\'' || next == '\\')
+			{
+				current.push_back(next);
+				++i;
+				continue;
+			}
+		}
+		if (c == '\'')
+		{
+			state = State::Normal;
+			continue;
+		}
+		current.push_back(c);
+	}
+
+	if (state != State::Normal)
+		LogWarning("Unterminated quote in command line; returning tokens parsed so far");
+
+	if (inToken || state != State::Normal)
+		tokens.push_back(std::move(current));
 
 	return tokens;
 }
