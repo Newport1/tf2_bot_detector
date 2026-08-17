@@ -340,6 +340,7 @@ ASALocalRun/
 healthchecksdb
 tf2_bot_detector/imgui.ini
 build/
+other_repos/
 CMakeFiles/
 .vscode/
 staging/cfg/settings.json
@@ -357,3 +358,13 @@ staging/cfg/addons_list.json
 /dist/
 /packaging/linux/tools/
 /packaging/linux/AppDir/
+
+# local planning / handoff / session docs - never committed
+team-ledger.md
+update_plan_aug16.md
+TF2BD_FORK_PLAN_RECONCILED.md
+HANDOFF.md
+.remember/
+
+# Written by the app at runtime; staging/ is the working directory when running the build.
+staging/imgui.ini

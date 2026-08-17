@@ -10,7 +10,6 @@
 
 #include "UI/MainWindow.h"
 #include "UI/SettingsWindow.h"
-#include "UI/PlayerListManagementWindow.h"
 #include <chrono>
 
 #ifdef WIN32
@@ -18,8 +17,6 @@
 #include <Windows.h>
 #include <Objbase.h>
 #include <shellapi.h>
-
-#include "d3d9.h"
 #else 
 // Why do they keep deprecating simple functions for complicated functions. 
 // Instead of busting your brains on nanosecond() might as well use usleep for the time being. 
@@ -89,16 +86,19 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 			if (!strcmp(argv[i], "-forward") && (i + 1) < argc) {
 				forwarded_arg = argv[i + 1];
 			}
+#ifdef TF2BD_ENABLE_TESTS
+			if (!strcmp(argv[i], "--run-tests"))
+			{
+				// forward everything after --run-tests to Catch2 for test selection
+				return tf2_bot_detector::RunTests(argc - (i + 1), argv + (i + 1));
+			}
+#endif
 #ifdef _DEBUG
 			if (!strcmp(argv[i], "--static-seed") && (i + 1) < argc)
 				tf2_bot_detector::g_StaticRandomSeed = atoi(argv[i + 1]);
 			else if (!strcmp(argv[i], "--run-tests"))
 			{
-#ifdef TF2BD_ENABLE_TESTS
-				return tf2_bot_detector::RunTests();
-#else
 				LogError("--run-tests was on the command line, but tests were not compiled in");
-#endif
 			}
 #endif
 		}
@@ -112,7 +112,6 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 		tf2_bot_detector::RunTests();
 #endif
 
-#ifndef TF2BD_OVERLAY_BUILD
 		DebugLog("Initializing TF2BDApplication...");
 		TF2BDRenderer renderer;
 
@@ -133,15 +132,6 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 				// important note: while mainwindow handles only drawing related stuff,
 				// it also handles "wake from sleep", when our application log (not tf2 log!) has new stuff
 				main_window->Draw();
-			});
-		}
-
-		if (false)
-		{
-			std::shared_ptr<PlayerListManagementWindow> plist = std::make_shared<PlayerListManagementWindow>();
-
-			renderer.RegisterDrawCallback([window = std::move(plist)]() {
-				window->Draw();
 			});
 		}
 
@@ -168,7 +158,6 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 
 			renderer.DrawFrame();
 		}
-#endif
 	}
 
 	ILogManager::GetInstance().CleanupEmptyLogs();
@@ -179,7 +168,9 @@ TF2_BOT_DETECTOR_EXPORT int tf2_bot_detector::RunProgram(int argc, const char** 
 
 #ifdef WIN32
 /// <summary>
-/// workaround so pazer's SmartScreen-signed exe works, calls the other windows-specific RunProgram().
+/// WinMain-signature export. Forwards to the argument-less RunProgram(),
+/// which parses the process command line and calls RunProgram(argc, argv).
+/// Must stay: the shipped Windows exe entry point calls this signature.
 /// </summary>
 /// <param name="hInstance">unused</param>
 /// <param name="hPrevInstance">unused</param>

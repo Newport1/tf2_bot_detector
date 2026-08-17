@@ -1,4 +1,5 @@
 #include "../Platform.h"
+#include "Util/PathUtils.h"
 #include "Util/TextUtils.h"
 #include "Log.h"
 
@@ -23,6 +24,7 @@
 #include <chrono>
 #include <exception>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <unordered_map>
 
@@ -211,12 +213,19 @@ mh::task<std::vector<std::string>> tf2_bot_detector::Processes::GetTF2CommandLin
 
 		ComPtr<CommandLineArgsQuerySink> pResponseSink(new CommandLineArgsQuerySink());
 
-		const bstr_t query(
-			"SELECT Name,CommandLine,CreationDate FROM Win32_Process "
-			"WHERE Name = \"tf_win64.exe\" or Name = \"tf.exe\" or Name = \"hl2.exe\" "
-			//"ORDER BY CreationDate DESC "
-			//"LIMIT 1"
-		);
+		std::string wql = "SELECT Name,CommandLine,CreationDate FROM Win32_Process WHERE ";
+		bool first = true;
+		for (const auto name : TF2ProcessNames())
+		{
+			if (!first)
+				wql += " or ";
+			first = false;
+			wql += "Name = \"";
+			wql += name;
+			wql += '"';
+		}
+
+		const bstr_t query(wql.c_str());
 
 		CHECK_HR(pSvc->ExecQueryAsync(bstr_t("WQL"),
 			query,

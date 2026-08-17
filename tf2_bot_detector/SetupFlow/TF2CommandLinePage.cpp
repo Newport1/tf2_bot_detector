@@ -3,6 +3,7 @@
 #include "Platform/Platform.h"
 #include "UI/ImGui_TF2BotDetector.h"
 #include "Log.h"
+#include "Util/PathUtils.h"
 #include "Util/TextUtils.h"
 
 #include "Application.h"
@@ -22,6 +23,7 @@
 #include <fmt/xchar.h>
 
 #include <chrono>
+#include <optional>
 #include <random>
 #include <ITF2BotDetectorRenderer.h>
 
@@ -233,96 +235,74 @@ static std::string FindUserLaunchOptions(const Settings& settings)
 /// <param name="settings"></param>
 /// <param name="rconPassword"></param>
 /// <param name="rconPort"></param>
-static void OpenTF2(const Settings& settings, const std::string_view& rconPassword, uint16_t rconPort)
+// Returns an error string if launch is refused; nullopt if the process was started.
+static std::optional<std::string> OpenTF2(const Settings& settings, const std::string_view& rconPassword, uint16_t rconPort)
 {
 	const std::filesystem::path gameEXE = settings.GetTFDir() / ".." / settings.GetBinaryName();
 
 	if (!std::filesystem::exists(gameEXE)) {
-		LogError("Can't open this file! (empty() returned true) path={}", gameEXE);
-		return;
+		auto msg = fmt::format("Can't open this file! (empty() returned true) path={}", gameEXE);
+		LogError("{}", msg);
+		return msg;
 	}
 
-	std::string args = settings.m_Unsaved.m_IsLaunchedFromSteam ? settings.m_Unsaved.m_ForwardedCommandLineArguments : FindUserLaunchOptions(settings);
+	std::string userArgs = settings.m_Unsaved.m_IsLaunchedFromSteam
+		? settings.m_Unsaved.m_ForwardedCommandLineArguments
+		: FindUserLaunchOptions(settings);
 
-	// TODO: scrub any conflicting alias or one-time-use commands from this
-	// required args
-	args <<
-		" bd" // Dummy option in case user has mismatched command line args in their steam config
-		" -game tf"
-		" -steam -secure"  // One or both of these is needed when launching the game directly
-		" -usercon"
-		" +developer 1"
-		" +ip 0.0.0.0"
-		" +sv_rcon_whitelist_address 127.0.0.1"
-		" +sv_quota_stringcmdspersecond 1000000" // workaround for mastercomfig causing crashes on local servers
-		" +rcon_password " << rconPassword <<
-		" +hostport " << rconPort <<
-		" +net_start"
-		" +con_timestamp 1"
-		" -condebug"
-		" -conclearlog"
-		;
+	const auto plan = PlanTF2LaunchArgs(
+		std::move(userArgs), rconPassword, rconPort, settings.m_UseLaunchRecommendedParams);
 
-
-#ifdef __linux__
-	if (args.length() > 437) {
-		LogWarning("forcing m_UseLaunchRecommendedParams=false as args is too long to fit!", args.length());
-	}
-
-	// 437 is the max we can go before tf2 doesn't launch (512 - RecommendedParams.length)
-	if (settings.m_UseLaunchRecommendedParams && args.length() <= 437)
-#else
-	if (settings.m_UseLaunchRecommendedParams)
-#endif
+	if (plan.action == TF2LaunchArgsAction::Refuse)
 	{
-		args
-			<< " +alias cl_reload_localization_files" // This command reloads files in backwards order, so any customizations get overwritten by stuff from the base game
-			<< " +alias developer" // disables the "developer" command
-			<< " +contimes 0" // the text in the top left when developer >= 1
-			<< " +alias ip"; // disables the "ip" command
+		LogError("{}", plan.error);
+		return plan.error;
+	}
+
+	if (plan.action == TF2LaunchArgsAction::DropOptionalParams)
+	{
+		LogWarning("Dropped recommended launch aliases because the command line is too long ({} chars, recommended-fit limit {})",
+			plan.length, kTF2LaunchArgsLimitWithRecommended);
 	}
 
 #ifdef __linux__
-	if (args.length() > 512) {
-		// the game will not launch, but let's try anyway.
-		LogWarning("args length is >512! (={}) the game might (will) not launch!", args.length());
-		// TODO: fail more dramatically, warn the user.
-	}
-
 	// we have to run w/ sniper runtime lib apparently.
 	// "TF2 requires the sniper container runtime" - tf.sh
-	const std::filesystem::path runtime_sniper = settings.GetSteamDir()/"steamapps"/"common"/"SteamLinuxRuntime_sniper"/"run";
+	const std::filesystem::path runtime_sniper = FindSteamLinuxRuntimeSniper(settings.GetSteamDir());
+
+	if (!IsSteamLinuxRuntimeSniperUsable(runtime_sniper))
+	{
+		// FindSteamLinuxRuntimeSniper returns empty when it searched every library and
+		// found nothing, so "{}" would render as an empty path and tell the user
+		// nothing. Say where we looked instead.
+		auto where = runtime_sniper.empty()
+			? fmt::format("in any Steam library under {}", settings.GetSteamDir())
+			: fmt::format("at {}", runtime_sniper);
+
+		auto msg = fmt::format(
+			"TF2 requires the \"Steam Linux Runtime 3.0 (sniper)\" to launch, "
+			"but it was not found or is not executable {}. "
+			"Steam installs it automatically as a TF2 dependency — open Steam, "
+			"install or update Team Fortress 2, and ensure "
+			"\"Steam Linux Runtime 3.0 (sniper)\" is installed.",
+			where);
+		LogError("{}", msg);
+		return msg;
+	}
 
 	// run the game with sniper w/ args.
 	// we now use tf.sh to handle libraries instead of calling tf_linux64 directly and handling libraries ourselves.
-	std::string sniper_args = fmt::format("--steam-app-id=440 --systemd-scope --keep-game-overlay \"{}\" -- {}", gameEXE.string(), args);
+	std::string sniper_args = fmt::format("--steam-app-id=440 --systemd-scope --keep-game-overlay \"{}\" -- {}", gameEXE.string(), plan.args);
 	// probably do not need
 	setenv("SteamEnv", "1", true);
-	/*
-	setenv("PRESSURE_VESSEL_PREFIX", "1", true);
-	setenv("PRESSURE_VESSEL_VARIABLE_DIR", "1", true);
-	// TODO: disable game overlay if the user wants it disabled
-	
-	setenv("LD_PRELOAD", "1", true);
-
-	setenv("STEAM_RUNTIME", "1", true);
-
-	// copied from "steam-runtime-launch-options -- %command% -novid"
-	// https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/docs/slr-for-game-developers.md#using-steam-runtime-launch-options
-	std::string tf2_cmd = fmt::format("{} {}", gameEXE, args);
-	const std::string sniper_entrypoint = fmt::format("{}/steamapps/common/SteamLinuxRuntime_sniper/_v2-entry-point --verb=waitforexitandrun -- {}", settings.GetSteamDir(), tf2_cmd);
-	const std::string steam_launch_wrapper = fmt::format("{}/ubuntu12_32/steam-launch-wrapper -- {}", settings.GetSteamDir(), sniper_entrypoint);
-	// steam reaper
-	const std::string final_cmd = fmt::format("{}/ubuntu12_32/reaper SteamLaunch AppId=440 -- {}", settings.GetSteamDir(), steam_launch_wrapper);
-	*/
-	// getenv("TF2BD_TF2_LD_PRELOAD")
 	// tf.sh expects the tf2 install dir (where it lives) as the cwd, not the sniper runtime dir.
 	Processes::Launch(runtime_sniper, sniper_args, false, gameEXE.parent_path());
 #else
 	// if not linux we don't have to do all of that and just launch the game.
 	// launch with the game's own dir as cwd (ShellExecute otherwise inherits our cwd).
-	Processes::Launch(gameEXE, args, false, gameEXE.parent_path());
+	Processes::Launch(gameEXE, plan.args, false, gameEXE.parent_path());
 #endif
+	return std::nullopt;
 }
 
 TF2CommandLinePage::RCONClientData::RCONClientData(std::string pwd, uint16_t port) :
@@ -487,13 +467,19 @@ void TF2CommandLinePage::DrawLaunchTF2Button(const DrawState& ds)
 					m_Data.m_RandomRCONPort = ds.m_Settings->m_TF2Interface.GetRandomRCONPort();
 				}
 
-				OpenTF2(*ds.m_Settings, m_Data.m_RandomRCONPassword, m_Data.m_RandomRCONPort);
+				if (auto err = OpenTF2(*ds.m_Settings, m_Data.m_RandomRCONPassword, m_Data.m_RandomRCONPort))
+					m_Data.m_LaunchError = std::move(*err);
+				else
+					m_Data.m_LaunchError.clear();
 				m_Data.m_LastTF2LaunchTime = curTime;
 			}
 
 			m_IsAutoLaunchAllowed = false;
 
 		}, "Finding command line arguments...");
+
+	if (!m_Data.m_LaunchError.empty())
+		ImGui::TextFmt({ 1, 0.25f, 0, 1 }, m_Data.m_LaunchError);
 
 	ImGui::NewLine();
 	ImGui::Indent();

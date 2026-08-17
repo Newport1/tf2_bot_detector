@@ -1,8 +1,8 @@
-#include "ConsoleLog/ConsoleLines.h"
+#include "ConsoleLog/ConsoleLines/ServerStatusPlayerLine.h"
 #include "SteamID.h"
 #include "WorldState.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <mh/error/not_implemented_error.hpp>
 
 using namespace std::chrono_literals;
@@ -22,6 +22,10 @@ namespace
 			throw mh::not_implemented_error();
 		}
 		virtual void Update() override
+		{
+			throw mh::not_implemented_error();
+		}
+		virtual void ResetScoreboard() override
 		{
 			throw mh::not_implemented_error();
 		}
@@ -85,6 +89,10 @@ namespace
 		{
 			throw mh::not_implemented_error();
 		}
+		virtual const IPlayer* LocalPlayer() const override
+		{
+			throw mh::not_implemented_error();
+		}
 		virtual size_t GetApproxLobbyMemberCount() const override
 		{
 			throw mh::not_implemented_error();
@@ -102,6 +110,14 @@ namespace
 			throw mh::not_implemented_error();
 		}
 		virtual bool IsVoteInProgress() const override
+		{
+			throw mh::not_implemented_error();
+		}
+		virtual const std::string& GetServerHostName() const override
+		{
+			throw mh::not_implemented_error();
+		}
+		virtual const std::string& GetMapName() const override
 		{
 			throw mh::not_implemented_error();
 		}

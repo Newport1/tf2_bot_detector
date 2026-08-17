@@ -154,151 +154,6 @@ namespace mh
 			}
 		}
 
-#if MH_HAS_CHAR8
-		MH_COMPILE_LIBRARY_INLINE size_t convert_to_uc(char32_t in, std::basic_string<char8_t>& out)
-		{
-			char8_t buf[4];
-			const size_t chars = convert_to_u8(in, buf);
-			out.append(buf, chars);
-			return chars;
-		}
-#endif
-		MH_COMPILE_LIBRARY_INLINE size_t convert_to_uc(char32_t in, std::basic_string<char16_t>& out)
-		{
-			char16_t buf[2];
-			const size_t chars = convert_to_u16(in, buf);
-			out.append(buf, chars);
-			return chars;
-		}
-		MH_COMPILE_LIBRARY_INLINE size_t convert_to_uc(char32_t in, std::basic_string<char32_t>& out)
-		{
-			out += in;
-			return 1;
-		}
-
-#if MH_HAS_CUCHAR
-		MH_COMPILE_LIBRARY_INLINE std::size_t convert_to_mb(char* buf, char16_t from,
-			std::mbstate_t& state)
-		{
-			return std::c16rtomb(buf, from, &state);
-		}
-		MH_COMPILE_LIBRARY_INLINE std::size_t convert_to_mb(char* buf, char32_t from,
-			std::mbstate_t& state)
-		{
-			return std::c32rtomb(buf, from, &state);
-		}
-
-		MH_COMPILE_LIBRARY_INLINE std::size_t convert_to_utf(char16_t* buf, const char* mb,
-			std::size_t mbmax, std::mbstate_t& state)
-		{
-			return std::mbrtoc16(buf, mb, mbmax, &state);
-		}
-		MH_COMPILE_LIBRARY_INLINE std::size_t convert_to_utf(char32_t* buf, const char* mb,
-			std::size_t mbmax, std::mbstate_t& state)
-		{
-			return std::mbrtoc32(buf, mb, mbmax, &state);
-		}
-
-		template<typename T>
-		inline void utf_to_mb(std::string& out, T u32, std::mbstate_t& state)
-		{
-			static_assert(is_utf_v<T>);
-#ifndef MB_LEN_MAX
-			constexpr int MB_LEN_MAX = 64;
-#endif
-			char tempBuf[MB_LEN_MAX];
-
-			const auto bytesWritten = convert_to_mb(tempBuf, u32, state);
-			if (bytesWritten == size_t(-1))
-				throw std::invalid_argument("Failed to convert all characters");
-			else if (bytesWritten > sizeof(tempBuf))
-				throw std::runtime_error("Stack corruption");
-
-			out.append(tempBuf, bytesWritten);
-		}
-
-#if MH_HAS_CHAR8
-		template<>
-		struct change_encoding_impl<char8_t, char>
-		{
-			std::basic_string<char> operator()(const char8_t* begin, const char8_t* end) const
-			{
-				std::basic_string<char> retVal;
-
-				std::mbstate_t state{};
-				for (auto it = begin; it != end; )
-				{
-					const char32_t u32 = convert_to_u32(it, end);
-					utf_to_mb(retVal, u32, state);
-				}
-
-				return retVal;
-			}
-		};
-#endif
-
-		template<typename From>
-		struct change_encoding_impl<From, char, std::enable_if_t<is_utf_v<From>>>
-		{
-			std::string operator()(const From* begin, const From* end) const
-			{
-				std::string retVal;
-				std::mbstate_t state{};
-
-				for (auto it = begin; it != end; ++it)
-					utf_to_mb(retVal, *it, state);
-
-				return retVal;
-			}
-		};
-
-		template<typename To>
-		struct change_encoding_impl<char, To, std::enable_if_t<!std::is_same_v<char, To>>>
-		{
-			std::basic_string<To> operator()(const char* begin, const char* end) const
-			{
-				static_assert(is_utf_v<To>);
-				std::basic_string<To> retVal;
-
-				std::mbstate_t state{};
-				for (auto it = begin; it != end; )
-				{
-					char32_t u32;
-					const auto result = convert_to_utf(&u32, it, end - it, state);
-					if (result == 0)
-					{
-						// Stored the null character, we're an std::string so we can continue
-						retVal += To(0);
-						state = {};
-						++it;
-					}
-					else if (result == static_cast<std::size_t>(-3))
-					{
-						// Another charN_t needs to be written to the output stream
-						convert_to_uc(u32, retVal);
-					}
-					else if (result == static_cast<std::size_t>(-2))
-					{
-						// FIXME is this correct? "...forms an incomplete, but so far valid, multibyte character"
-						// https://en.cppreference.com/w/cpp/string/multibyte/mbrtoc32
-						throw std::invalid_argument("Segment forms invalid UTF character sequence");
-					}
-					else if (result == static_cast<std::size_t>(-1))
-					{
-						throw std::runtime_error("Encoding error");
-					}
-					else
-					{
-						it += result;
-						convert_to_uc(u32, retVal);
-					}
-				}
-
-				return retVal;
-			}
-		};
-#endif  // __has_include(<cuchar>)
-
 		template<typename From, typename To>
 		struct change_encoding_impl<From, To, std::enable_if_t<!std::is_same_v<From, To>&& is_utf_v<From>&& is_utf_v<To>>>
 		{
@@ -341,41 +196,80 @@ namespace mh
 		};
 #endif // MH_HAS_UNICODE
 
+#if MH_HAS_CHAR8
+		// UTF-8 to UTF-8: identity byte copy. char is UTF-8 in this library.
+		template<>
+		struct change_encoding_impl<char8_t, char>
+		{
+			std::basic_string<char> operator()(const char8_t* begin, const char8_t* end) const
+			{
+				return std::basic_string<char>(
+					reinterpret_cast<const char*>(begin),
+					static_cast<std::size_t>(end - begin));
+			}
+		};
+
+		template<>
+		struct change_encoding_impl<char, char8_t>
+		{
+			std::basic_string<char8_t> operator()(const char* begin, const char* end) const
+			{
+				return std::basic_string<char8_t>(
+					reinterpret_cast<const char8_t*>(begin),
+					static_cast<std::size_t>(end - begin));
+			}
+		};
+#endif
+
+#if MH_HAS_UNICODE
+		template<typename From>
+		struct change_encoding_impl<From, char, std::enable_if_t<is_utf_v<From>
+#if MH_HAS_CHAR8
+			&& !std::is_same_v<From, char8_t>
+#endif
+			>>
+		{
+			std::string operator()(const From* begin, const From* end) const
+			{
+				const auto u8 = change_encoding_impl<From, char8_t>{}(begin, end);
+				return change_encoding_impl<char8_t, char>{}(u8.data(), u8.data() + u8.size());
+			}
+		};
+
+		template<typename To>
+		struct change_encoding_impl<char, To, std::enable_if_t<is_utf_v<To>
+#if MH_HAS_CHAR8
+			&& !std::is_same_v<To, char8_t>
+#endif
+			>>
+		{
+			std::basic_string<To> operator()(const char* begin, const char* end) const
+			{
+				const auto u8 = change_encoding_impl<char, char8_t>{}(begin, end);
+				return change_encoding_impl<char8_t, To>{}(u8.data(), u8.data() + u8.size());
+			}
+		};
+#endif
+
 		template<> struct change_encoding_impl<char, wchar_t>
 		{
 			std::basic_string<wchar_t> operator()(const char* begin, const char* end) const
 			{
-				std::basic_string<wchar_t> retVal;
-
-				std::mbstate_t state{};
-				for (auto it = begin; it != end; )
+				// wchar_t is UTF-16 on Windows and UTF-32 everywhere else, so the code
+				// unit values are identical to char16_t / char32_t. Copy element-wise
+				// rather than reinterpret_cast-ing the buffer: this is built with -flto
+				// and strict aliasing on, which is exactly where type punning between
+				// distinct types is allowed to miscompile.
+				if constexpr (sizeof(wchar_t) == 2)
 				{
-					wchar_t wc;
-					const auto result = std::mbrtowc(&wc, it, end - it, &state);
-
-					if (result == 0)
-					{
-						// Stored the null character, we're an std::string so we can continue
-						retVal += wc;
-						state = {};
-						++it;
-					}
-					else if (result == static_cast<std::size_t>(-2))
-					{
-						throw std::invalid_argument("Segment forms invalid multibyte character sequence");
-					}
-					else if (result == static_cast<std::size_t>(-1))
-					{
-						throw std::runtime_error("Encoding error");
-					}
-					else
-					{
-						it += result;
-						retVal += wc;
-					}
+					const auto converted = change_encoding_impl<char, char16_t>{}(begin, end);
+					return std::wstring(converted.begin(), converted.end());
 				}
-
-				return retVal;
+				else
+				{
+					const auto converted = change_encoding_impl<char, char32_t>{}(begin, end);
+					return std::wstring(converted.begin(), converted.end());
+				}
 			}
 		};
 
@@ -383,33 +277,20 @@ namespace mh
 		{
 			std::basic_string<char> operator()(const wchar_t* begin, const wchar_t* end) const
 			{
-				std::basic_string<char> retVal;
-
-				const auto MB_CUR_MAX_VAL = MB_CUR_MAX;
-				char* buf = reinterpret_cast<char*>(alloca(MB_CUR_MAX_VAL));
-				std::mbstate_t state{};
-				for (auto it = begin; it != end; )
+				// Element-wise copy, not a reinterpret_cast of the buffer -- see the note
+				// in change_encoding_impl<char, wchar_t> above.
+				if constexpr (sizeof(wchar_t) == 2)
 				{
-					size_t result;
-#if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
-					wcrtomb_s(&result, buf, MB_CUR_MAX_VAL, *it, &state);
-#else
-					result = std::wcrtomb(buf, *it, &state);
-#endif
-
-					if (result == static_cast<std::size_t>(-1))
-					{
-						throw std::invalid_argument("Invalid wide character");
-					}
-					else
-					{
-						assert(result != 0);
-						it += result;
-						retVal.append(buf, result);
-					}
+					const std::u16string converted(begin, end);
+					return change_encoding_impl<char16_t, char>{}(
+						converted.data(), converted.data() + converted.size());
 				}
-
-				return retVal;
+				else
+				{
+					const std::u32string converted(begin, end);
+					return change_encoding_impl<char32_t, char>{}(
+						converted.data(), converted.data() + converted.size());
+				}
 			}
 		};
 

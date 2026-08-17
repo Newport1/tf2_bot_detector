@@ -25,7 +25,7 @@ target_include_directories(tf2_bot_detector_renderer PUBLIC "${CMAKE_CURRENT_SOU
 # lol
 target_compile_definitions(tf2_bot_detector_renderer PUBLIC BD_VERSION="${TF2BD_VERSION_MAJOR}.${TF2BD_VERSION_MINOR}.${TF2BD_VERSION_PATCH}")
 
-# OPENGL / DX9 / VULKAN (dxvk/x64)
+# OPENGL / VULKAN (dxvk/x64)
 set(TF2BD_RENDERER_MODE "OPENGL" CACHE STRING "render mode to compile in")
 target_compile_definitions(tf2_bot_detector_renderer PUBLIC BD_RENDERER_MODE=${TF2BD_RENDERER_MODE})
 
@@ -35,12 +35,9 @@ if(NOT imgui_USE_MULTI_VIEWPORTS)
 	target_compile_definitions(tf2_bot_detector_renderer PUBLIC TF2BD_IMGUI_NO_MUTLI_VIEWPORTS)
 endif()
 
-# option(TF2BD_IS_OVERLAY "compile this as an overlay." off)
-
 # imgui options ig
 option(imgui_USE_OPENGL2 "Includes the OpenGL2 implementation." off)
 option(imgui_USE_OPENGL3 "Includes the OpenGL3 implementation." on)
-option(imgui_USE_DX9 "Includes the DirectX9 implementation." on)
 
 option(imgui_USE_GLAD2 "Uses Glad2 implementation." on)
 
@@ -79,15 +76,7 @@ target_include_directories(imgui PUBLIC
 )
 
 if (TF2BD_RENDERER_MODE STREQUAL "DX9")
-	target_sources(
-		tf2_bot_detector_renderer PRIVATE 
-		"d3d9.h"
-		"d3d9.cpp"
-	)
-
-	# backend: dx9
-	if(imgui_USE_DX9)
-	endif()
+	message(FATAL_ERROR "TF2BD_RENDERER_MODE=DX9 has been removed. Use OPENGL (default) or VULKAN.")
 elseif(TF2BD_RENDERER_MODE STREQUAL "VULKAN")
 	# backend: vulkan (!)
 	if(imgui_USE_VULKAN)

@@ -39,7 +39,13 @@ ServerStatusPlayerLine::ServerStatusPlayerLine(time_point_t timestamp, PlayerSta
 
 std::shared_ptr<IConsoleLine> ServerStatusPlayerLine::TryParse(const ConsoleLineTryParseArgs& args)
 {
-	static const std::regex s_Regex(R"regex(#\s+(\d+)\s+"((?:.)+)"\s+(\[.*\])\s+(?:(\d+):)?(\d+):(\d+)\s+(\d+)\s+(\d+)\s+(\w+)(?:\s+(.*))?)regex", std::regex::optimize);
+	// d3596d7 narrowed group 2 to ((?:.)+) claiming CR/LF cannot appear in a username.
+	// If that is true this costs nothing: regex_match still anchors the whole pattern,
+	// and an LF cannot reach TryParse because the log reader splits lines first. A lone
+	// CR does not split a line on either platform, so the strict form silently drops
+	// that player's entire status row — they never appear in the player list. That is
+	// the outcome a bot would want. Silently losing a player is worse than a loose regex.
+	static const std::regex s_Regex(R"regex(#\s+(\d+)\s+"((?:.|[\r\n])+)"\s+(\[.*\])\s+(?:(\d+):)?(\d+):(\d+)\s+(\d+)\s+(\d+)\s+(\w+)(?:\s+(.*))?)regex", std::regex::optimize);
 	
 	if (svmatch result; std::regex_match(args.m_Text.begin(), args.m_Text.end(), result, s_Regex))
 	{

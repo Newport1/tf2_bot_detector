@@ -1,12 +1,12 @@
 {
-	"$schema": "https://raw.githubusercontent.com/PazerOP/tf2_bot_detector/master/schemas/v3/rules.schema.json",
+	"$schema": "https://raw.githubusercontent.com/Newport1/tf2_bot_detector/custom/schemas/v3/rules.schema.json",
 	"file_info": {
 		"authors": [
 			"pazer"
 		],
 		"description": "Official rules list for TF2 Bot Detector.",
 		"title": "Official rules list",
-		"update_url": "https://raw.githubusercontent.com/PazerOP/tf2_bot_detector/master/staging/cfg/rules.official.json"
+		"update_url": "https://raw.githubusercontent.com/Newport1/tf2_bot_detector/custom/staging/cfg/rules.official.json"
 	},
 	"rules": [
 		{

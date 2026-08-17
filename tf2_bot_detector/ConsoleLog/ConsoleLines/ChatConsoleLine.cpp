@@ -150,6 +150,40 @@ static void ProcessChatMessage(const ChatConsoleLine& msgLine, const Settings::T
 	}
 }
 
+#ifdef TF2BD_ENABLE_TESTS
+#include <catch2/catch_test_macros.hpp>
+
+TEST_CASE("ProcessChatMessage - Newlines", "[tf2bd]")
+{
+	const auto TestProcessChatMessage = [](std::string message)
+	{
+		ChatConsoleLine line(tfbd_clock_t::now(), "<playername>", std::move(message), false, false, false, TeamShareResult::SameTeams, SteamID{});
+
+		Settings::Theme dummyTheme;
+
+		std::string output;
+
+		ProcessChatMessage(line, dummyTheme,
+			[&](const ImVec4& color, const std::string_view& msg)
+			{
+				output << msg << '\n';
+			},
+			[&]()
+			{
+				output << "<sameline>";
+			});
+
+		return output;
+	};
+
+	REQUIRE(TestProcessChatMessage("this is a normal message") ==
+		"<playername>\n<sameline>: \n<sameline>this is a normal message\n");
+	REQUIRE(TestProcessChatMessage("this is\n\na message with newlines in it") ==
+		"<playername>\n<sameline>: \n<sameline>this is\n<sameline>(\\n x 2)\n<playername>\n<sameline>: \n<sameline>a message with newlines in it\n");
+}
+
+#endif
+
 void ChatConsoleLine::Print(const PrintArgs& args) const
 {
 	ImGuiDesktop::ScopeGuards::ID id(this);

@@ -147,6 +147,12 @@ bool RCONActionManager::ShouldDiscardCommand(const std::string_view& cmd) const
 	if (!m_IsDiscardingServerCommands || !m_Settings.m_ConfigCompatibilityMode)
 		return false;
 
+	// Seeing "status"/"ping" discarded in the log is expected, not a fault. This only
+	// applies while connecting: Source flood-limits server-processed commands and kicks
+	// with "Issued too many commands to server" (a0bcc1e). The window closes as soon as
+	// TF2 execs a class cfg on spawn -- OnLocalPlayerInitialized, via the console.log
+	// reader, which does not go through RCON, so there is no chicken-and-egg here.
+	// Everything below is client-side and therefore un-kickable.
 	static const std::unordered_set<std::string_view> s_KnownClientCommands =
 	{
 		"tf_lobby_debug",

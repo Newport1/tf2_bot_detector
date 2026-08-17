@@ -769,8 +769,6 @@ void MainWindow::OnDrawMenuBar()
 
 	if (!isInSetupFlow || m_Application->m_SetupFlow.GetCurrentPage() == SetupFlowPage::TF2CommandLine)
 	{
-		//if (ImGui::MenuItem("PlayerList")) {}
-
 		if (ImGui::MenuItem("Settings")) {
 			ToggleSettingsPopup();
 		}
@@ -779,7 +777,7 @@ void MainWindow::OnDrawMenuBar()
 	if (ImGui::BeginMenu("Help"))
 	{
 		if (ImGui::MenuItem("Open GitHub"))
-			Shell::OpenURL("https://github.com/surepy/tf2_bot_detector");
+			Shell::OpenURL("https://github.com/Newport1/tf2_bot_detector");
 		if (ImGui::MenuItem("Open Discord"))
 			Shell::OpenURL("https://discord.gg/W8ZSh3Z");
 

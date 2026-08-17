@@ -1,0 +1,24 @@
+"libraryfolders"
+{
+	"0"
+	{
+		"path"		"/tmp/tf2bd-test-default-steam"
+		"label"		""
+		"contentid"		"0"
+		"totalsize"		"0"
+		"apps"
+		{
+		}
+	}
+	"1"
+	{
+		"path"		"/mnt/tf2bd-test-second-drive/SteamLibrary"
+		"label"		"games"
+		"contentid"		"1"
+		"totalsize"		"0"
+		"apps"
+		{
+			"440"		"12345"
+		}
+	}
+}

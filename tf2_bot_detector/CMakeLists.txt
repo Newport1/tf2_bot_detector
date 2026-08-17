@@ -32,22 +32,28 @@ if (WIN32)
 	set_target_properties(tf2_bot_detector_launcher PROPERTIES OUTPUT_NAME "tf2_bot_detector")
 	target_compile_features(tf2_bot_detector_launcher PUBLIC cxx_std_20)
 else()
-	add_executable(tf2_bot_detector
-		"Launcher/main.cpp"
-	)
+	# Library + thin launcher, matching the Windows split so tests (and any
+	# other extra executable) can link the application. STATIC keeps a single
+	# output executable (no extra .so / RPATH) and works with Release LTO.
+	# OBJECT was rejected: CMAKE_RUNTIME_OUTPUT_DIRECTORY + OUTPUT_NAME made
+	# the object-lib target collide with the launcher binary path.
+	add_library(tf2_bot_detector STATIC)
+	set_target_properties(tf2_bot_detector PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 	# https://gcc.gnu.org/onlinedocs/libstdc++/manual/status.html#iso.2017.par2ts
 	# Note 3: The Parallel Algorithms have an external dependency on Intel TBB 2018 or later. 
 	# If the <execution> header is included then -ltbb must be used to link to TBB. 
-	find_package(TBB REQUIRED tbb)
+	find_package(TBB CONFIG REQUIRED)
 	message(STATUS "Installed TBB Version: ${TBB_VERSION}")
 	if (TBB_VERSION_MAJOR VERSION_LESS "2018")
-   		message(FATAL_ERROR "This program requires tbb 2018 or higher.")
+  		message(FATAL_ERROR "This program requires tbb 2018 or higher.")
 	endif()
 
-	# in some platforms TBB_IMPORTED_TARGETS = nothing cuz ???
+	# TBB now comes from vcpkg (see vcpkg.json), so the imported targets always exist.
+	# The old raw `-ltbb` link option was a workaround for a system TBB with no CMake
+	# config; with the vcpkg static libs it just makes ld hunt for a libtbb.so that
+	# isn't there. Do not add it back.
 	target_link_libraries(tf2_bot_detector PUBLIC TBB::tbb TBB::tbbmalloc)
-	target_link_options(tf2_bot_detector PRIVATE -ltbb)
 
 	# warnings don't exist if you pretend they don't exist
 	target_compile_options(tf2_bot_detector PRIVATE -w)
@@ -56,9 +62,43 @@ else()
 	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 		target_compile_definitions(tf2_bot_detector PRIVATE _DEBUG)
 	endif()
+
+	add_executable(tf2_bot_detector_launcher
+		"Launcher/main.cpp"
+	)
+	target_include_directories(tf2_bot_detector_launcher PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+	# DO NOT REMOVE --whole-archive. It is load-bearing for the APPLICATION, not
+	# just for tests.
+	#
+	# Every ConsoleLog/ConsoleLines/*.cpp translation unit registers its line type
+	# at static-init time through ConsoleLineBase::AutoRegister (IConsoleLine.h).
+	# Nothing ever references those TUs by symbol. Back when this target was an
+	# add_executable the objects were linked in directly, so the registrars always
+	# ran. Now that the app is a STATIC archive, a normal link discards every
+	# object file with no referenced symbol -- the binary still builds and starts,
+	# but IConsoleLine::ParseConsoleLine silently stops recognising most console
+	# lines and the scoreboard just never populates. The __attribute__((used)) on
+	# AutoRegister stops the *compiler* dropping it; it does not stop the *linker*
+	# dropping the whole object out of the archive.
+	#
+	# It also happens to keep Catch2 TEST_CASE registrars, which is why the same
+	# flag is on tf2_bot_detector_cli.
+	target_link_libraries(tf2_bot_detector_launcher PRIVATE
+		-Wl,--whole-archive tf2_bot_detector -Wl,--no-whole-archive
+		mh::stuff)
+	set_target_properties(tf2_bot_detector_launcher PROPERTIES OUTPUT_NAME "tf2_bot_detector")
+	target_compile_features(tf2_bot_detector_launcher PUBLIC cxx_std_20)
 endif()
 
-target_link_libraries(tf2_bot_detector PRIVATE tf2_bot_detector_renderer)
+# On Windows the app target is SHARED, so PRIVATE deps stay inside the DLL.
+# On Linux it is STATIC, so consumers (launcher, cli) need those deps at final link.
+if (WIN32)
+	set(TF2BD_APP_LINK_SCOPE PRIVATE)
+else()
+	set(TF2BD_APP_LINK_SCOPE PUBLIC)
+endif()
+
+target_link_libraries(tf2_bot_detector ${TF2BD_APP_LINK_SCOPE} tf2_bot_detector_renderer)
 
 target_compile_features(tf2_bot_detector PUBLIC cxx_std_20)
 set_target_properties(tf2_bot_detector PROPERTIES
@@ -213,8 +253,6 @@ target_sources(tf2_bot_detector PRIVATE
 	"UI/MainWindow.Scoreboard.cpp"
 	"UI/SettingsWindow.cpp"
 	"UI/SettingsWindow.h"
-	"UI/PlayerListManagementWindow.cpp"
-	"UI/PlayerListManagementWindow.h"
 	"Util/JSONUtils.h"
 	"Util/PathUtils.cpp"
 	"Util/PathUtils.h"
@@ -311,7 +349,7 @@ if (TF2BD_ENABLE_DISCORD_INTEGRATION)
 		message("DISCORD_GAME_SDK = ${DISCORD_GAME_SDK}")
 	endif()
 
-	target_link_libraries(tf2_bot_detector PRIVATE ${DISCORD_GAME_SDK})
+	target_link_libraries(tf2_bot_detector ${TF2BD_APP_LINK_SCOPE} ${DISCORD_GAME_SDK})
 
 	find_path(GAME_SDK_INCLUDE discord-game-sdk/discord.h)
 	target_include_directories(tf2_bot_detector PRIVATE ${DISCORD_GAME_SDK_INCLUDE})
@@ -355,7 +393,7 @@ if (TF2BD_ENABLE_DISCORD_INTEGRATION)
 		)
 	endif()
 
-	target_link_libraries(tf2_bot_detector PRIVATE ${DISCORD_CPP_GAME_SDK})
+	target_link_libraries(tf2_bot_detector ${TF2BD_APP_LINK_SCOPE} ${DISCORD_CPP_GAME_SDK})
 
 	target_sources(tf2_bot_detector PRIVATE
 		"DiscordRichPresence.cpp"
@@ -365,7 +403,7 @@ if (TF2BD_ENABLE_DISCORD_INTEGRATION)
 	# We really only need this library for one thing in the DRP integration.
 	# Later on it will probably be moved out of this if statement when it is required elsewhere in the code.
 	find_package(cryptopp CONFIG REQUIRED)
-	target_link_libraries(tf2_bot_detector PRIVATE cryptopp-static)
+	target_link_libraries(tf2_bot_detector ${TF2BD_APP_LINK_SCOPE} cryptopp-static)
 endif()
 
 find_package(nlohmann_json CONFIG REQUIRED)
@@ -377,7 +415,7 @@ find_package(SQLiteCpp CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(cpprestsdk CONFIG REQUIRED)
 
-target_link_libraries(tf2_bot_detector PRIVATE
+target_link_libraries(tf2_bot_detector ${TF2BD_APP_LINK_SCOPE}
 	tf2_bot_detector::common
 	tf2_bot_detector_renderer
 	ValveFileVDF
@@ -396,27 +434,38 @@ if (TF2BD_ENABLE_TESTS)
 	enable_testing()
 
 	find_package(Catch2 CONFIG REQUIRED)
-	target_link_libraries(tf2_bot_detector PRIVATE Catch2::Catch2)
+	target_link_libraries(tf2_bot_detector ${TF2BD_APP_LINK_SCOPE} Catch2::Catch2)
 	target_compile_definitions(tf2_bot_detector PRIVATE TF2BD_ENABLE_TESTS)
 	target_sources(tf2_bot_detector PRIVATE
 		"Tests/Catch2.cpp"
 		"Tests/ConsoleLineTests.cpp"
+		"Tests/EncodingTests.cpp"
 		"Tests/FormattingTests.cpp"
 		"Tests/HumanDurationTests.cpp"
+		"Tests/PathUtilsTests.cpp"
+		"Tests/ConfigSchemaInfoTests.cpp"
 		"Tests/PlayerRuleTests.cpp"
+		"Tests/RealSteamInstallTests.cpp"
+		"Tests/ShellTests.cpp"
 		"Tests/Tests.h"
 	)
 
 	SET(TF2BD_ENABLE_CLI_EXE true)
 
 	add_test(NAME TF2BD_Tests COMMAND tf2_bot_detector_cli --run-tests
-		WORKING_DIRECTORY staging
+		WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/staging"
 	)
 endif()
 
 if(TF2BD_ENABLE_CLI_EXE)
 	add_executable(tf2_bot_detector_cli "Launcher/main.cpp")
 	target_include_directories(tf2_bot_detector_cli PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-	target_link_libraries(tf2_bot_detector_cli PRIVATE tf2_bot_detector mh::stuff)
+	if (WIN32)
+		target_link_libraries(tf2_bot_detector_cli PRIVATE tf2_bot_detector mh::stuff)
+	else()
+		target_link_libraries(tf2_bot_detector_cli PRIVATE
+			-Wl,--whole-archive tf2_bot_detector -Wl,--no-whole-archive
+			mh::stuff)
+	endif()
 	target_compile_features(tf2_bot_detector_cli PUBLIC cxx_std_17)
 endif()

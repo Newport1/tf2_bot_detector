@@ -124,7 +124,6 @@ namespace
 				decltype(std::declval<State_t>().emplace<T>(std::move(args)...), void())
 			{
 				SetUpdateStatus(location, status, std::move(msg));
-				DebugLog(__FUNCSIG__);
 				m_Variant.emplace<T>(std::move(args)...);
 			}
 
@@ -142,7 +141,9 @@ namespace
 			void ClearUpdateCheck(const mh::source_location& location, UpdateStatus status, const std::string_view& msg)
 			{
 				SetUpdateStatus(location, status, msg);
-				DebugLog(MH_SOURCE_LOCATION_CURRENT()); // <- ??
+				// UpdateCheckState_t has no empty alternative, so "cleared" is a
+				// default-constructed (invalid) future -- same convention as
+				// CanReplaceUpdateCheckState().
 				m_UpdateCheckVariant.emplace<0>();
 			}
 
@@ -150,7 +151,6 @@ namespace
 			void SetUpdateCheck(const mh::source_location& location, UpdateStatus status, const std::string_view& msg, T value)
 			{
 				SetUpdateStatus(location, status, msg);
-				DebugLog(__FUNCSIG__);
 				m_UpdateCheckVariant.emplace<T>(std::forward<T>(value));
 			}
 
@@ -207,7 +207,6 @@ namespace
 				{
 					auto value = future->get().value();
 					SetUpdateStatus(MH_SOURCE_LOCATION_CURRENT(), success, std::string(successMsg));
-					DebugLog(MH_SOURCE_LOCATION_CURRENT());
 					variant.template emplace<TFutureResult>(std::move(value));
 				}
 			}
@@ -278,7 +277,10 @@ namespace
 			m_IsUpdateQueued = false;
 		}
 
-		if (auto future = std::get_if<std::future<BuildInfo>>(&m_State.GetUpdateCheckVariant()))
+		// valid() matters: a cleared check is an invalid future still sitting at index 0,
+		// so without this the failure path below re-fires every frame forever.
+		if (auto future = std::get_if<std::future<BuildInfo>>(&m_State.GetUpdateCheckVariant());
+			future && future->valid())
 		{
 			try
 			{

@@ -1,12 +1,12 @@
 {
-	"$schema": "https://raw.githubusercontent.com/PazerOP/tf2_bot_detector/master/schemas/v3/discord_rich_presence.schema.json",
+	"$schema": "https://raw.githubusercontent.com/Newport1/tf2_bot_detector/custom/schemas/v3/discord_rich_presence.schema.json",
 	"file_info": {
 		"authors": [
 			"pazer"
 		],
 		"description": "Rich presence settings for TF2 Bot Detector.",
 		"title": "Rich presence settings",
-		"update_url": "https://raw.githubusercontent.com/PazerOP/tf2_bot_detector/master/staging/cfg/discord_rich_presence.json"
+		"update_url": "https://raw.githubusercontent.com/Newport1/tf2_bot_detector/custom/staging/cfg/discord_rich_presence.json"
 	},
 	"maps": {
 		"cp_5gorge": {},

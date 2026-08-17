@@ -99,6 +99,41 @@ for both reads and writes; no read/write split, no XDG, no separate data dir.
 - [ ] Move CI Windows runner back to `windows-latest` after cpprestsdk is dropped (currently
       pinned to `windows-2022` to dodge the VS 2026 `stdext` removal).
 
+## From live testing (2026-08-16)
+
+Both raised from a ~2h live Windows session on `01fdb9f`. No bots or cheaters encountered,
+so detection itself is untested against real targets; these are the two user-facing gaps
+that did surface.
+
+- [ ] **Remove the SteamRep "goto profile" link.** `Settings.cpp:488` adds
+      `SteamRep — https://steamrep.com/profiles/%SteamID64%` to `m_GotoProfileSites`. The site
+      is down/deprecated and no longer live, so the menu entry is a dead end for every user.
+      Worth noting while removing it: SteamRep publishes a **downloadable dump of their
+      database** at that link, which could seed a future offline list — capture it before the
+      domain lapses entirely, since it becomes unrecoverable once it does.
+- [ ] **Add a general-purpose player tag** — `etc` or `custom`. Today every mark has to borrow
+      an existing semantic tag, which corrupts the meaning of that tag's data. Real cases from
+      the session: a possible YouTuber/streamer, a suspicious player who might just be very
+      good, a friend not yet added, and a player encountered often in pubs. None of those are
+      cheating claims and none fit the existing attributes. (`racist` was used as a stand-in
+      during testing — those marks are placeholders, not real classifications, and the
+      resulting `playerlist.json` entries should be re-tagged or dropped rather than shipped.)
+
+### Observed and explained, no action needed
+
+- A player entry rendered blank during the session. Cause identified: the player had left, or
+  had not finished connecting. Not a defect.
+- RCON logs one burst of `WSAECONNABORTED` at shutdown (8 lines at `21:57:45`). Root cause is
+  a teardown race — `disconnect()` closes a live socket while `read_packet_len()` is blocked in
+  `recv`, which Winsock reports as an abort where POSIX would not. Fires only at teardown,
+  after play has stopped, and is purely cosmetic. It is intermittent because it depends on
+  whether a read happens to be in flight at close time (a clean quit at `19:47:27` produced none).
+- `chat_*.log` and `console_*.log` read as **0 bytes while the app is running**. Windows does
+  not refresh a file's directory-entry size while a handle is open; the data is being written
+  the whole time. This session's were 16.9 KB and 6.1 MB once the app exited. Not a bug, but it
+  looks exactly like one during testing.
+- Auto-kick and auto-chat were **not exercised** this session. Still untested on Windows.
+
 ## Carried over from migration.md (still open)
 
 - [ ] **Finish dropping the `mh::stuff` shim.** SourceRCON no longer uses mh

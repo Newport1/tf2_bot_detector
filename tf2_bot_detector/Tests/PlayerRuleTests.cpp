@@ -1,10 +1,10 @@
 #include "Config/Rules.h"
-#include "IPlayer.h"
+#include "GameData/IPlayer.h"
 
 #include <mh/error/not_implemented_error.hpp>
 #include <mh/text/codecvt.hpp>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 using namespace std::string_view_literals;
 using namespace tf2_bot_detector;
@@ -27,15 +27,19 @@ namespace
 		{
 			throw mh::not_implemented_error();
 		}
-		const mh::expected<SteamAPI::PlayerSummary, std::error_condition>& GetPlayerSummary() const override
+		const mh::expected<SteamAPI::PlayerSummary>& GetPlayerSummary() const override
 		{
 			throw mh::not_implemented_error();
 		}
-		const mh::expected<SteamAPI::PlayerBans, std::error_condition>& GetPlayerBans() const override
+		const mh::expected<SteamAPI::PlayerBans>& GetPlayerBans() const override
 		{
 			throw mh::not_implemented_error();
 		}
-		mh::expected<duration_t, std::error_condition> GetTF2Playtime() const override
+		const mh::expected<SteamHistoryAPI::PlayerSourceBanState>& GetPlayerSourceBanState() const override
+		{
+			throw mh::not_implemented_error();
+		}
+		mh::expected<duration_t> GetTF2Playtime() const override
 		{
 			throw mh::not_implemented_error();
 		}
@@ -92,6 +96,10 @@ namespace
 			throw mh::not_implemented_error();
 		}
 		const mh::expected<LogsTFAPI::PlayerLogsInfo>& GetLogsInfo() const override
+		{
+			throw mh::not_implemented_error();
+		}
+		const mh::expected<SteamAPI::PlayerFriends>& GetFriendsInfo() const override
 		{
 			throw mh::not_implemented_error();
 		}
