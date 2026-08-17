@@ -28,10 +28,24 @@ namespace
 {
 	std::filesystem::path HomeDir()
 	{
+#ifdef _WIN32
+		// MSVC deprecates getenv, and the project builds with /WX. USERPROFILE is
+		// the Windows analogue of HOME; note DiscoverSteamDir only probes Linux
+		// layouts, so these cases still skip at the Steam-discovery gate.
+		char* value = nullptr;
+		std::size_t len = 0;
+		if (_dupenv_s(&value, &len, "USERPROFILE") != 0 || !value)
+			return {};
+
+		std::filesystem::path home = value;
+		std::free(value);
+		return home;
+#else
 		if (const char* home = std::getenv("HOME"))
 			return home;
 
 		return {};
+#endif
 	}
 }
 
