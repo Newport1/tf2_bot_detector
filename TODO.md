@@ -119,6 +119,44 @@ that did surface.
       during testing — those marks are placeholders, not real classifications, and the
       resulting `playerlist.json` entries should be re-tagged or dropped rather than shipped.)
 
+- [ ] **TF2 quit leaves TF2BD stuck on the player list, and we may be causing the hang.**
+      Reported 2026-08-16 from live Windows testing: after quitting TF2, *both* Steam ("Quit
+      Game") and TF2BD still showed it running, and TF2BD kept displaying the empty player-list
+      panel instead of returning to the launch button.
+
+      Steam agreeing means the process really was still alive, so TF2BD was reporting honestly.
+      The problem is what TF2BD does with that answer. `TF2CommandLinePage::ValidateSettings`
+      (`:85`) releases the RCON client **only** when `IsTF2Running()` is false:
+
+      ```cpp
+      if (!Processes::IsTF2Running()) {
+          // ... reset m_RCONClient
+          return ValidateSettingsResult::TriggerOpen;
+      }
+      ```
+
+      So TF2BD holds an open RCON socket to TF2's listen server for exactly as long as TF2
+      appears to be running, and only lets go once it has fully exited. If that socket is part
+      of what stalls TF2's shutdown, the two wait on each other. Circular by construction,
+      independent of whether it is the actual cause here.
+
+      **Cheap decisive test — quit TF2BD first, then TF2.** Exits clean ⇒ our socket is
+      implicated and this is our bug. Still hangs ⇒ TF2's own shutdown, and only the UI below
+      is ours to fix.
+
+      Two things worth fixing either way:
+      - **No manual recovery.** The only way out of that state is `IsTF2Running()` going false,
+        so a user whose TF2 hangs has a permanently stuck UI and no override.
+      - **The platforms answer different questions.** Windows is
+        `FindWindowA("Valve001", nullptr)` (`Platform/Windows/Processes.cpp:78`) — a *window*
+        class lookup, uncached, and not TF2-specific since other Source games share the class.
+        Linux is a 2s-cached scan of `TF2ProcessNames()` (`Platform/Linux/Processes.cpp:31`) — a
+        *process* check. A process can outlive its window and vice versa, so the two platforms
+        will disagree exactly during shutdown.
+
+      Related history: the reset exists because of surepy issue #25, where a retained client
+      queued commands "until we literally run out of ports". Any fix has to keep that closed.
+
 ### Observed and explained, no action needed
 
 - A player entry rendered blank during the session. Cause identified: the player had left, or
