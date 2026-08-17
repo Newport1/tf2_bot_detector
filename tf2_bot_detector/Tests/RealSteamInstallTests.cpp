@@ -26,36 +26,45 @@ using namespace tf2_bot_detector;
 
 namespace
 {
+	// Finding "the Steam install on this machine" is genuinely platform-specific, and
+	// not just cosmetically so. Linux keeps it under $HOME in one of several layouts,
+	// which DiscoverSteamDir probes. Windows records it in the registry, under
+	// HKCU\Software\Valve\Steam, which Platform::GetCurrentSteamDir reads.
+	//
+	// DiscoverSteamDir knows only the Linux layouts, so calling it on Windows returned
+	// empty for any input and skipped every case below -- even on a machine with Steam
+	// installed and TF2 on a secondary library, which is precisely what these tests
+	// exist to check. DiscoverSteamDir is deliberately left alone: PathUtilsTests
+	// asserts it returns empty for synthetic homes, and a registry probe inside it
+	// would make those unit tests find the real install instead.
+#ifdef _WIN32
+	std::filesystem::path RealSteamDir()
+	{
+		return Platform::GetCurrentSteamDir();
+	}
+#else
 	std::filesystem::path HomeDir()
 	{
-#ifdef _WIN32
-		// MSVC deprecates getenv, and the project builds with /WX. USERPROFILE is
-		// the Windows analogue of HOME; note DiscoverSteamDir only probes Linux
-		// layouts, so these cases still skip at the Steam-discovery gate.
-		char* value = nullptr;
-		std::size_t len = 0;
-		if (_dupenv_s(&value, &len, "USERPROFILE") != 0 || !value)
-			return {};
-
-		std::filesystem::path home = value;
-		std::free(value);
-		return home;
-#else
 		if (const char* home = std::getenv("HOME"))
 			return home;
 
 		return {};
-#endif
 	}
+
+	std::filesystem::path RealSteamDir()
+	{
+		const auto home = HomeDir();
+		if (home.empty())
+			return {};
+
+		return DiscoverSteamDir(home);
+	}
+#endif
 }
 
 TEST_CASE("real install: Steam directory is discoverable", "[.realsteam]")
 {
-	const auto home = HomeDir();
-	if (home.empty())
-		SKIP("HOME is not set");
-
-	const auto steamDir = DiscoverSteamDir(home);
+	const auto steamDir = RealSteamDir();
 	if (steamDir.empty())
 		SKIP("no Steam installation found on this machine");
 
@@ -65,11 +74,7 @@ TEST_CASE("real install: Steam directory is discoverable", "[.realsteam]")
 
 TEST_CASE("real install: TF2 is found even on a non-default library", "[.realsteam]")
 {
-	const auto home = HomeDir();
-	if (home.empty())
-		SKIP("HOME is not set");
-
-	const auto steamDir = DiscoverSteamDir(home);
+	const auto steamDir = RealSteamDir();
 	if (steamDir.empty())
 		SKIP("no Steam installation found on this machine");
 
@@ -93,11 +98,7 @@ TEST_CASE("real install: TF2 is found even on a non-default library", "[.realste
 
 TEST_CASE("real install: library enumeration yields no duplicates", "[.realsteam]")
 {
-	const auto home = HomeDir();
-	if (home.empty())
-		SKIP("HOME is not set");
-
-	const auto steamDir = DiscoverSteamDir(home);
+	const auto steamDir = RealSteamDir();
 	if (steamDir.empty())
 		SKIP("no Steam installation found on this machine");
 
