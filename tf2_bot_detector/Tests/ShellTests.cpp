@@ -20,8 +20,9 @@ namespace
 
 using Case = std::pair<std::string_view, std::vector<std::string>>;
 
-// Cases where both tokenizers agree. Every input here starts with a plain,
-// unquoted token on purpose -- see the argv[0] note below.
+// Cases where both tokenizers agree. The Windows side prepends a placeholder
+// program name before CommandLineToArgvW (Platform/Windows/Shell.cpp), so no input
+// here is subject to argv[0] rules and leading quotes/whitespace are safe to assert.
 TEST_CASE("SplitCommandLineArgs - table", "[tf2bd][shell]")
 {
 	const Case cases[] = {
@@ -30,6 +31,9 @@ TEST_CASE("SplitCommandLineArgs - table", "[tf2bd][shell]")
 		{ "foo \"bar \\\"baz\\\"\"", { "foo", "bar \"baz\"" } },
 		{ "-a    \t  -b", { "-a", "-b" } },
 		{ "  -novid -console  ", { "-novid", "-console" } },
+		// A bare quoted empty token, leading. This used to be POSIX-only because it
+		// landed in argv[0]; with the placeholder prepended both platforms agree.
+		{ "\"\"", { "" } },
 	};
 
 	for (const auto& [input, expected] : cases)
@@ -63,13 +67,6 @@ TEST_CASE("SplitCommandLineArgs - POSIX quoting", "[tf2bd][shell]")
 	const Case cases[] = {
 		{ "'quoted value'", { "quoted value" } },
 		{ "plain\\ space", { "plain space" } },
-		// A bare quoted empty first token. Deliberately NOT asserted on Windows:
-		// SplitCommandLineArgs hands the raw string to CommandLineToArgvW without
-		// prepending a program name (Platform/Windows/Shell.cpp:123), so the first
-		// token is parsed under argv[0] rules, where quote handling differs and the
-		// empty-command-line case is special-cased by the API. The non-leading form
-		// is covered for both platforms by the "empty quoted token" case below.
-		{ "\"\"", { "" } },
 	};
 
 	for (const auto& [input, expected] : cases)

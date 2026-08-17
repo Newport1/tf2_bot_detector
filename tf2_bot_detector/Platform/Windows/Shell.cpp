@@ -110,7 +110,14 @@ void tf2_bot_detector::Shell::ExploreToAndSelect(std::filesystem::path path)
 
 std::vector<std::string> tf2_bot_detector::Shell::SplitCommandLineArgs(const std::string_view& cmdline)
 {
+	// CommandLineToArgvW parses the first token under argv[0] rules, which are not
+	// the ordinary argument rules: quoting behaves differently, backslash escapes do
+	// not apply, a leading-whitespace command line yields an empty argv[0], and an
+	// empty command line is special-cased to the current executable's path. Callers
+	// hand us Steam launch options, which have no program name, so prepend a
+	// placeholder and drop it -- then every real token is parsed as an argument.
 	auto cmdLineW = tf2_bot_detector::ToWC(cmdline);
+	cmdLineW.insert(0, L"tf2bd ");
 
 	struct Free
 	{
@@ -119,11 +126,13 @@ std::vector<std::string> tf2_bot_detector::Shell::SplitCommandLineArgs(const std
 
 	using argptr_t = std::unique_ptr<std::remove_pointer_t<LPWSTR>*, Free>;
 
-	int argc;
+	int argc = 0;
 	argptr_t argvW(CommandLineToArgvW(cmdLineW.c_str(), &argc));
+	if (!argvW)
+		return {};
 
 	std::vector<std::string> args;
-	for (int i = 0; i < argc; i++)
+	for (int i = 1; i < argc; i++)   // skip the placeholder argv[0]
 		args.push_back(ToMB(argvW.get()[i]));
 
 	return args;
