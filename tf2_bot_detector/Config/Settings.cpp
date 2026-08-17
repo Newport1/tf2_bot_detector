@@ -485,7 +485,9 @@ void Settings::AddDefaultGotoProfileSites()
 	m_GotoProfileSites.push_back({ "Steam Community", "https://steamcommunity.com/profiles/%SteamID64%" });
 	m_GotoProfileSites.push_back({ "logs.tf", "https://logs.tf/profile/%SteamID64%" });
 	m_GotoProfileSites.push_back({ "RGL", "https://rgl.gg/Public/PlayerProfile.aspx?p=%SteamID64%" });
-	m_GotoProfileSites.push_back({ "SteamRep", "https://steamrep.com/profiles/%SteamID64%" });
+	// SteamRep removed: the site is down/deprecated, so the menu entry was a dead end for
+	// every user. They publish a dump of their database -- worth capturing as a seed for an
+	// offline list before the domain lapses, since it is unrecoverable once it does.
 	m_GotoProfileSites.push_back({ "UGC League", "https://www.ugcleague.com/players_page.cfm?player_id=%SteamID64%" });
 	m_GotoProfileSites.push_back({ "SteamHistory", "https://steamhistory.net/id/%SteamID64%" });
 }
