@@ -58,7 +58,11 @@ using Microsoft::WRL::ComPtr;
 #ifdef _DEBUG
 namespace tf2_bot_detector
 {
-	extern bool g_SkipOpenTF2Check;
+	// Was declared extern here and defined nowhere, so it could never actually be used --
+	// referencing it was an unresolved external. Defined (not just declared) so IsTF2Running
+	// can be forced true in a debug build without a running TF2, which is the only way to
+	// exercise the setup flow's TF2-running branches locally.
+	bool g_SkipOpenTF2Check = false;
 }
 #endif
 
@@ -77,7 +81,30 @@ namespace
 }
 bool tf2_bot_detector::Processes::IsTF2Running()
 {
-	return !!FindWindowA("Valve001", nullptr);
+#ifdef _DEBUG
+	if (g_SkipOpenTF2Check)
+		return true;
+#endif
+
+	// Was FindWindowA("Valve001", nullptr) -- a *window class* lookup, which answers a
+	// different question than the Linux side's process check, and gets it wrong in both
+	// directions:
+	//   - false positive: "Valve001" is the generic Source engine window class, so any
+	//     other Source game (CS:S, L4D2, ...) made this return true.
+	//   - false negative: the window is destroyed before the process exits, so RCON could
+	//     be released while TF2 was still alive. FindWindow is also desktop/session-scoped.
+	// Now mirrors Linux::IsTF2Running: a cached scan over TF2ProcessNames(). Cached because
+	// this is polled from the setup flow every frame; 2s matches the Linux interval.
+	static mh::cached_variable cached(std::chrono::seconds(2), []()
+		{
+			for (const auto name : TF2ProcessNames())
+			{
+				if (IsProcessRunning(name))
+					return true;
+			}
+			return false;
+		});
+	return cached.get();
 }
 
 namespace
@@ -249,24 +276,46 @@ bool tf2_bot_detector::Processes::IsSteamRunning()
 	return m_CachedValue.get();
 }
 
-// optimization, instead of going through CreateToolhelp32Snapshot over and over again, just open a handle and check exit code.
-static std::unordered_map<std::string, HANDLE> processHandles;
+// Optimization: instead of going through CreateToolhelp32Snapshot over and over again, keep a
+// handle to the process we found and just check its exit code.
+//
+// Guarded by a mutex: IsTF2Running() polls this from the setup flow while IsSteamRunning()
+// polls it from elsewhere, so the cache is genuinely shared across threads. It was previously
+// a bare static map with a single caller, which only looked safe.
+static std::mutex s_ProcessHandlesMutex;
+static std::unordered_map<std::string, SafeHandle> s_ProcessHandles;
 
 bool tf2_bot_detector::Processes::IsProcessRunning(const std::string_view& processName)
 {
-	if (processHandles.contains(processName.data())) {
-		HANDLE hndProcess = processHandles.at(processName.data());
-		DWORD dwExitCode;
-		if (GetExitCodeProcess(hndProcess, &dwExitCode) && dwExitCode == STILL_ACTIVE) {
-			return true;
-		}
+	// Key on an owned string. The parameter is a string_view, which is not guaranteed to be
+	// null-terminated, so the old code's processName.data() could read past the end -- it only
+	// happened to work because every caller passed a literal.
+	const std::string key(processName);
 
-		// our handle is invalid, and we should get a new one.
-		processHandles.erase(processName.data());
-		CloseHandle(hndProcess);
+	std::lock_guard lock(s_ProcessHandlesMutex);
+
+	if (auto found = s_ProcessHandles.find(key); found != s_ProcessHandles.end())
+	{
+		DWORD exitCode{};
+		if (GetExitCodeProcess(found->second.get(), &exitCode) && exitCode == STILL_ACTIVE)
+			return true;
+
+		// Either the process exited or the handle went bad. Drop it and re-scan; SafeHandle
+		// closes it for us. (The old code called CloseHandle on the raw value, including when
+		// OpenProcess had returned NULL.)
+		s_ProcessHandles.erase(found);
 	}
 
-	const SafeHandle snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0));
+	// Check before wrapping: INVALID_HANDLE_VALUE is non-null, so handing it to SafeHandle
+	// would have HandleDeleter call CloseHandle on it. Previously unchecked entirely.
+	HANDLE rawSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (rawSnapshot == INVALID_HANDLE_VALUE)
+	{
+		LogError("Failed to snapshot processes: {}", GetLastErrorCode());
+		return false;
+	}
+
+	const SafeHandle snapshot(rawSnapshot);
 
 	PROCESSENTRY32 entry{};
 	entry.dwSize = sizeof(entry);
@@ -282,7 +331,12 @@ bool tf2_bot_detector::Processes::IsProcessRunning(const std::string_view& proce
 	{
 		if (mh::case_insensitive_compare(std::string_view(entry.szExeFile), processName))
 		{
-			processHandles.insert_or_assign(processName.data(), OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ProcessID));
+			// OpenProcess can legitimately fail -- an elevated TF2 denies a non-elevated us.
+			// Only cache a handle we actually got; the process is running either way, we just
+			// have to re-scan next time instead of checking an exit code.
+			if (HANDLE opened = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ProcessID))
+				s_ProcessHandles.insert_or_assign(key, SafeHandle(opened));
+
 			return true;
 		}
 

@@ -47,7 +47,8 @@
 
 - [Table of Contents](#table-of-contents)
 - [Installation](#installation)
-  - [Typical Install (works for nearly everyone)](#typical-install-works-for-nearly-everyone)
+  - [Windows](#windows)
+  - [Linux](#linux)
   - [Advanced Installation](#advanced-installation)
 - [General Usage](#general-usage)
   - [How to launch TF2BD](#how-to-launch-tf2bd)
@@ -76,11 +77,37 @@
 
 ## Installation
 
-### Typical Install
+### Windows
 
 1. Download and install the [Microsoft Visual C++ Redistributable for Visual Studio 2015, 2017 and 2019][mscr-link]
-2. Download the [latest release][releases-link]
+2. Download `tf2-bot-detector_windows-2022_x64-windows_*.zip` from the [latest release][releases-link]  
+   *(the `x86-windows` zip is the 32-bit build — if you don't know which you want, you want x64)*
 3. Extract the zip in any location inside your user folder (e.g. Downloads, Documents, Desktop, etc)
+
+> Do **not** extract into `Program Files`. The tool keeps its config, logs and playerlist next to itself, and that location is not user-writable.
+
+> These builds are **not code-signed**, so Windows SmartScreen will warn you on first launch. Choose *More info → Run anyway*.
+
+> The zip contains a `launch_tf2bd_linux.sh` file. **That is not for you** — it comes from the shared packaging folder and is only used by the plain-binary Linux build. Windows users can ignore or delete it.
+
+### Linux
+
+1. Download `tf2-bot-detector_appimage_x64-ubuntu_*.zip` from the [latest release][releases-link]
+2. Extract it into a folder of its own
+3. Make the AppImage executable — a zip built on Windows does not carry the permission bit:
+   ```sh
+   chmod +x tf2_bot_detector-x86_64.AppImage
+   ```
+4. Run it:
+   ```sh
+   ./tf2_bot_detector-x86_64.AppImage
+   ```
+
+> **Keep the folder together.** The AppImage is *just the binary*; `cfg/`, `fonts/`, `images/`, `licenses/` and `tf2_addons/` sit **beside** it, not inside it. Whichever folder the AppImage lives in is also where it reads and writes its config and logs. Move the whole folder, never the AppImage on its own, or it will start with no assets.
+
+> TF2 itself requires the **Steam Linux Runtime 3.0 (sniper)**. Steam installs it automatically as a TF2 dependency — if TF2BD reports that it cannot find it, install or verify TF2 in Steam and it will appear.
+
+> If you are running the plain-binary build (the `staging/` artifact) rather than the AppImage, launch it with the bundled `launch_tf2bd_linux.sh` instead of running the binary directly — it sets `LD_LIBRARY_PATH` for the bundled shared libraries and forces `SDL_VIDEODRIVER=x11`, since the Wayland backend crashes.
 
 ### Advanced Installation
 
@@ -91,7 +118,7 @@ All of the installation methods in that page are not supported in this fork.
 ## General Usage
 
 ### How to launch TF2BD
-Double click `tf2_bot_detector.exe` or ``tf2_bot_detector`` executable in the folder you downloaded from the installation section.
+Double click `tf2_bot_detector.exe` (Windows) or `tf2_bot_detector-x86_64.AppImage` (Linux) in the folder you extracted in the installation section.
 
 ### First run
 When you first run the tool it will ask if you would like to allow internet connectivity and which update channel you would like. These can be changed later in the settings menu.
@@ -179,7 +206,7 @@ Note that by default if there are multiple tool users in the same server, a "Bot
 
 ### I downloaded the tool but I don't see an executable. What went wrong?
 
-You likely downloaded the source code instead of the actual tool. Make sure you are downloading one of the .ZIPs that is not labeled "Source Code." There are two of them, one labeled with an x86 and one with an x64. If you don't know which one you want, you almost certainly want the one with the x64. For further instructions go [here][getting-started-wiki].
+You likely downloaded the source code instead of the actual tool. Make sure you are downloading one of the .ZIPs that is not labeled "Source Code." On Windows there are two, one labeled `x86-windows` and one `x64-windows`; if you don't know which one you want, you almost certainly want the x64. On Linux you want the one labeled `appimage`. For further instructions go [here][getting-started-wiki].
 
 ### This doesn't detect anything!
 
@@ -189,7 +216,9 @@ Right now the base player list and rule set is very very limited due to an abund
 
 ### Help! The tool wont open!
 
-Make sure you have [Microsoft Visual C++ Redistributable for Visual Studio 2015, 2017 and 2019][mscr-link] installed. If you just installed it make to to restart your computer after to finish the installation. If that does not work try following the steps located [here][getting-started-wiki].
+On Windows, make sure you have [Microsoft Visual C++ Redistributable for Visual Studio 2015, 2017 and 2019][mscr-link] installed. If you just installed it make to to restart your computer after to finish the installation. If that does not work try following the steps located [here][getting-started-wiki].
+
+On Linux, the two usual causes are a missing execute bit (`chmod +x tf2_bot_detector-x86_64.AppImage`) and an AppImage that has been moved away from its `cfg/` and `fonts/` folders — see the [Linux](#linux) install steps.
 
 For further assistance either open an [issue][issues-url] on github or join our [discord][discord-link] for faster, community based support.
 

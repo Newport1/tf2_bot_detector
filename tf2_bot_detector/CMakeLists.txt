@@ -448,6 +448,7 @@ if (TF2BD_ENABLE_TESTS)
 		"Tests/PlayerRuleTests.cpp"
 		"Tests/RealSteamInstallTests.cpp"
 		"Tests/ShellTests.cpp"
+		"Tests/WindowsProcessTests.cpp"
 		"Tests/Tests.h"
 	)
 
