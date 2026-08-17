@@ -100,14 +100,44 @@ for the ones that turned out to be already resolved.
 
 ### P0
 
-- [ ] **Retest the TF2-quit path after the Linux zombie fix.**
-      Windows detects TF2 with `FindWindowA("Valve001", nullptr)`
-      (`Platform/Windows/Processes.cpp:78`) — a *window class* lookup, not a process check, and
-      the class is shared by other Source games. Linux now does a zombie-aware *process* check,
-      so the two platforms answer different questions and will disagree during shutdown.
-      The zombie concept doesn't exist on Windows, but a lingering window would produce the
-      same stuck UI that the Linux zombie did. Confirm TF2BD returns to the launch button when
-      TF2 exits. Cheap decisive test: quit TF2BD first, then TF2, and compare.
+- [ ] **Live-test the TF2-quit path.** Code side is done (below); this is the manual half.
+      Launch TF2 from TF2BD, quit TF2, confirm TF2BD returns to the launch button and releases
+      the RCON client rather than sitting on an empty player list. Also confirm the *launch*
+      path still works, since `IsTF2Running` now gates it on a process scan rather than a window.
+      Second pass worth doing: quit TF2BD first, then TF2, and compare.
+
+- [x] **`IsTF2Running` switched from a window lookup to a process scan.**
+      Was `FindWindowA("Valve001", nullptr)` — a *window class* lookup, wrong in both directions:
+      `Valve001` is the generic Source engine class, so any other Source game read as TF2; and
+      the window dies before the process does, so RCON could be released while TF2 was alive
+      (`FindWindow` is also desktop/session-scoped). Now mirrors `Linux::IsTF2Running`: a 2s
+      cached scan over `TF2ProcessNames()`.
+
+- [x] **`IsProcessRunning` hardened** — it had a single caller, so its defects were latent;
+      routing `IsTF2Running` through it would have made all of them live.
+      - The static handle cache had **no mutex**, and is now polled from two paths.
+      - Keyed on `string_view::data()`, which is not guaranteed null-terminated. Every caller
+        passed a literal, so it never bit — but `TF2ProcessNames()` now feeds it.
+      - `OpenProcess` result cached unchecked; it returns NULL on access-denied (elevated TF2),
+        after which `GetExitCodeProcess(NULL)` fails and `CloseHandle(NULL)` logged an error
+        every poll. Only non-null handles are cached now, and they are `SafeHandle`-owned.
+      - `CreateToolhelp32Snapshot` was not checked for `INVALID_HANDLE_VALUE` — which is
+        non-null, so `HandleDeleter` would have closed it.
+
+- [x] **`g_SkipOpenTF2Check` made usable.** Was declared `extern` under `_DEBUG` and defined
+      nowhere, so referencing it was an unresolved external. Now defined and honoured by
+      `IsTF2Running`, which is the only way to exercise the TF2-running branches of the setup
+      flow without a running TF2.
+
+- [x] **`Tests/WindowsProcessTests.cpp`** — the counterpart to `LinuxProcessTests.cpp`.
+      Covers a child observed starting and exiting through the handle cache, a name that cannot
+      exist not poisoning the cache, a deliberately non-null-terminated `string_view`, and
+      `IsTF2Running` agreeing with a hand-rolled scan of `TF2ProcessNames()`.
+      Honest limits: the `string_view` case pins the intended behaviour but would not have
+      *failed* the old code (the miswritten key poisoned the cache without changing the answer),
+      the mutex fix is not covered because races are not deterministic, and the `IsTF2Running`
+      case only becomes load-bearing with TF2 actually running — which is what the live test
+      above is for.
 
 ### P1
 
@@ -117,11 +147,11 @@ for the ones that turned out to be already resolved.
 ### P3
 
 - [ ] Live-test auto-kick and auto-chat — still completely unexercised on Windows
-- [ ] `launch_tf2bd_linux.sh` ships inside the Windows zips because both jobs upload the shared
-      `staging/` folder (`build-linux.yml:158-164`). It is *not* in the AppImage zip, which is
-      built from `dist/`, so the one platform that could use it doesn't get it. Either move the
-      script out of `staging/` into the Linux job, or exclude it from the Windows upload.
-      README currently explains this away rather than fixing it.
+- [x] `launch_tf2bd_linux.sh` no longer ships inside the Windows zips. Both jobs upload the
+      shared `staging/` folder, and the script is checked in there, so it reached Windows users
+      while *not* reaching Linux users (the AppImage zip is built from `dist/`). The Windows
+      "Prepare staging/" step now removes it. **Needs a dispatch CI run to verify** — it is a
+      workflow change and cannot be exercised locally.
 
 ### Observed / no action needed (Windows)
 
