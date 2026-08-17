@@ -434,15 +434,14 @@ static std::string BuildTF2RequiredLaunchArgs(std::string_view rconPassword, uin
 	const std::string_view secureArg = userDisabledVAC ? " -steam" : " -steam -secure";
 
 	return fmt::format(
-		// TODO(linux-triage): this leading " bd" is handed to TF2 as a bare positional
-		// argument on every launch, on both platforms. Nothing in the codebase reads a
-		// "bd" token; it looks like a fragment of "tf2bd" left behind when this function
-		// was introduced in 26884bc, a commit otherwise about libraryfolders.vdf parsing.
-		// Observed live on Windows:
-		//   "...\tf_win64.exe"  bd -game tf -steam -secure -usercon ...
-		// Deliberately NOT removed here: this is the launch path, and the Linux side runs
-		// it through the sniper runtime and tf.sh rather than exec'ing the binary directly,
-		// so dropping a token needs a real Linux launch to confirm rather than a unit test.
+		// Sacrificial token -- keep it. The user's own launch options are prepended
+		// verbatim, so if theirs ends with a flag that expects a value, that flag
+		// swallows whatever comes next. This is what gets swallowed instead of
+		// "-game tf". Nothing reads it because nothing is meant to.
+		// Upstream called it " dummy" ("Dummy option in case user has mismatched
+		// command line args in their steam config"); surepy renamed it to " bd" in
+		// fa99c91 and kept the behaviour. The comment was lost when this function was
+		// extracted in 26884bc, which is what made it look like stray debris.
 		" bd"
 		" -game tf"
 		"{}"
