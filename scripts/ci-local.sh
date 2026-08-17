@@ -68,9 +68,12 @@ rc=$?
 [ $rc -eq 0 ] || fail "tests" $rc
 
 # Hidden tests that read the real Steam install. They SKIP rather than fail when
-# Steam or TF2 is absent, so this is safe to run anywhere.
+# Steam or TF2 is absent -- but Catch2 treats "every test skipped" as "no tests ran"
+# and exits 4, so this stage was counted as FAILED on any machine without TF2
+# installed, which is most of them. --allow-running-no-tests makes the all-skipped
+# case exit 0 while a genuine failure still exits non-zero.
 stage "tests [realsteam]"
-"./$BUILD_DIR/tf2_bot_detector/tf2_bot_detector_cli" --run-tests "[realsteam]"
+"./$BUILD_DIR/tf2_bot_detector/tf2_bot_detector_cli" --run-tests "[realsteam]" --allow-running-no-tests
 rc=$?
 [ $rc -eq 0 ] || fail "tests [realsteam]" $rc
 

@@ -434,6 +434,15 @@ static std::string BuildTF2RequiredLaunchArgs(std::string_view rconPassword, uin
 	const std::string_view secureArg = userDisabledVAC ? " -steam" : " -steam -secure";
 
 	return fmt::format(
+		// TODO(linux-triage): this leading " bd" is handed to TF2 as a bare positional
+		// argument on every launch, on both platforms. Nothing in the codebase reads a
+		// "bd" token; it looks like a fragment of "tf2bd" left behind when this function
+		// was introduced in 26884bc, a commit otherwise about libraryfolders.vdf parsing.
+		// Observed live on Windows:
+		//   "...\tf_win64.exe"  bd -game tf -steam -secure -usercon ...
+		// Deliberately NOT removed here: this is the launch path, and the Linux side runs
+		// it through the sniper runtime and tf.sh rather than exec'ing the binary directly,
+		// so dropping a token needs a real Linux launch to confirm rather than a unit test.
 		" bd"
 		" -game tf"
 		"{}"
