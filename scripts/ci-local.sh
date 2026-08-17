@@ -10,9 +10,10 @@
 #
 # Exit code is the number of failed stages, so `&&` chaining works.
 #
-# ponytail: Linux only. The Windows half of CI has no local equivalent here --
-# that gap is real and is not pretended away; dispatch the workflow manually if
-# you need it.
+# Runs on Windows too, under Git Bash or WSL. Native MSVC needs a Developer
+# Prompt (for -G Ninja to find cl.exe); everything else is the same. What this
+# still does NOT cover on either platform: launching the app, the Steam Linux
+# Runtime sniper path, and any GPU/render code. Those are manual.
 
 set -u
 
@@ -62,8 +63,24 @@ cmake --build "$BUILD_DIR"
 rc=$?
 [ $rc -eq 0 ] || { fail "build" $rc; echo "FAILED STAGES: $FAILED"; exit $FAILED; }
 
+# Ninja drops the binary in one place, multi-config generators add a per-config
+# subdir, and Windows adds .exe. Look rather than guess.
+CLI=
+for candidate in \
+	"$BUILD_DIR/tf2_bot_detector/tf2_bot_detector_cli" \
+	"$BUILD_DIR/tf2_bot_detector/tf2_bot_detector_cli.exe" \
+	"$BUILD_DIR/tf2_bot_detector/Release/tf2_bot_detector_cli.exe"
+do
+	if [ -x "$candidate" ]; then CLI="./$candidate"; break; fi
+done
+if [ -z "$CLI" ]; then
+	fail "locate test binary" 1
+	printf '\n=== FAILED STAGES: %s\n' "$FAILED"
+	exit $FAILED
+fi
+
 stage "tests"
-"./$BUILD_DIR/tf2_bot_detector/tf2_bot_detector_cli" --run-tests
+"$CLI" --run-tests
 rc=$?
 [ $rc -eq 0 ] || fail "tests" $rc
 
@@ -73,7 +90,7 @@ rc=$?
 # installed, which is most of them. --allow-running-no-tests makes the all-skipped
 # case exit 0 while a genuine failure still exits non-zero.
 stage "tests [realsteam]"
-"./$BUILD_DIR/tf2_bot_detector/tf2_bot_detector_cli" --run-tests "[realsteam]" --allow-running-no-tests
+"$CLI" --run-tests "[realsteam]" --allow-running-no-tests
 rc=$?
 [ $rc -eq 0 ] || fail "tests [realsteam]" $rc
 
