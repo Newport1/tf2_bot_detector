@@ -119,6 +119,44 @@ that did surface.
       during testing — those marks are placeholders, not real classifications, and the
       resulting `playerlist.json` entries should be re-tagged or dropped rather than shipped.)
 
+- [x] **TF2 quit left TF2BD stuck on the player list — FIXED, root cause was `kill(pid, 0)`.**
+      Reported 2026-08-16 from live testing on *Linux*: after quitting TF2, both Steam ("Quit
+      Game") and TF2BD still showed it running, and TF2BD stayed on the empty player-list panel
+      instead of returning to the launch button.
+
+      Root cause: `Linux::IsProcessRunningPid` was `return kill(pid, 0) == 0`, and **`kill(pid, 0)`
+      succeeds for a zombie** — a process that has exited but has not been reaped by its parent.
+      TF2 routinely lingers as `<defunct>` on quit, which is the same reason Steam keeps offering
+      "Quit Game". Verified by forking a real zombie: `/proc` state `Z`, `kill(pid,0) == 0`.
+
+      Consequences, all from that one line: `IsTF2Running()` never went false, so
+      `TF2CommandLinePage::ValidateSettings` never released the RCON client and never returned
+      `TriggerOpen`; the UI had no path back to the launch button; and TF2BD reconnected to a dead
+      listener every ~5s indefinitely (visible in the log at 22:25 as `Socket (104) opened` →
+      4s → `socket error` → repeat). That retry loop is the same one that produced surepy issue
+      #25, "until we literally run out of ports".
+
+      Fixed by reading the state field of `/proc/<pid>/stat` and treating `Z` as not running.
+      Regression test `Tests/LinuxProcessTests.cpp` forks an actual zombie; it fails against the
+      old implementation and passes against the new one.
+
+      Note the RCON *connection* was already being refused while this was happening, i.e. TF2's
+      engine was fully gone. TF2BD was not holding TF2 open — it was only failing to notice.
+
+- [ ] **Two related weaknesses left in the same path, not fixed here.**
+      - `getPidFromProcessName` (`LinuxHelpers.h:21`) matches with
+        `strstr(cmdline, name)` against `/proc/<pid>/cmdline`, i.e. a **substring** of argv[0],
+        and returns the first `readdir` hit. On Linux TF2 runs behind
+        `reaper` → `pressure-vessel` → `tf.sh` → `tf_linux64`, so a substring match can latch
+        onto a wrapper. This is the same hazard the `kTF2ProcessNames` comment in
+        `PathUtils.cpp` warns about, reintroduced one layer down.
+      - The two platforms answer different questions: Windows is
+        `FindWindowA("Valve001", nullptr)` (`Platform/Windows/Processes.cpp:78`), a *window*-class
+        lookup that is not TF2-specific since other Source games share the class; Linux is a
+        2s-cached *process* check. They will disagree during shutdown. The Windows side has not
+        been retested since this fix and may still hang — the zombie concept does not exist
+        there, but a lingering window would produce the same stuck UI.
+
 ### Observed and explained, no action needed
 
 - A player entry rendered blank during the session. Cause identified: the player had left, or
