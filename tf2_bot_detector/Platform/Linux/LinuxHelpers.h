@@ -10,14 +10,15 @@
 #include <signal.h>
 
 #include <fstream>
+#include <string>
 
 namespace tf2_bot_detector::Linux
 {
     // PID cache
-    static std::unordered_map<std::string_view, pid_t> processPids;
+    inline std::unordered_map<std::string_view, pid_t> processPids;
 
     // chatgpt generated code cuz lazy
-    pid_t getPidFromProcessName(const std::string &processName)
+    inline pid_t getPidFromProcessName(const std::string &processName)
     {
         DIR *dir = opendir("/proc");
         if (dir != nullptr)
@@ -54,7 +55,7 @@ namespace tf2_bot_detector::Linux
     // if you dont have ~/.steam/steam.pid, this will fail
     // but i dont really understand why you won't have .steam/steam.pid
     // TODO if /.steam/steam.pid fails, grab it from getPidFromProcessName()
-    pid_t GetSteamPID()
+    inline pid_t GetSteamPID()
     {
         std::filesystem::path steam_pid_path = std::filesystem::path(getenv("HOME")) / ".steam" / "steam.pid";
         std::ifstream steam_pid_file(steam_pid_path);
@@ -64,12 +65,37 @@ namespace tf2_bot_detector::Linux
         return ret;
     }
 
-    bool IsProcessRunningPid(pid_t pid)
+    inline bool IsProcessRunningPid(pid_t pid)
     {
         if (pid == -1)
         {
             return false;
         }
-        return kill(pid, 0) == 0;
+
+        // NOT kill(pid, 0). That succeeds for a zombie -- a process that has already
+        // exited but whose parent has not reaped it yet. TF2 routinely lingers as
+        // <defunct> after you quit (which is also why Steam keeps offering "Quit
+        // Game"), so kill() reported the game as alive indefinitely: IsTF2Running()
+        // never went false, the RCON client was never released, and the UI stayed
+        // stuck on an empty player list with no way back to the launch button.
+        //
+        // The state field of /proc/<pid>/stat is what actually tells them apart.
+        std::ifstream stat(std::filesystem::path("/proc") / std::to_string(pid) / "stat");
+
+        std::string line;
+        if (!std::getline(stat, line))
+        {
+            return false; // no /proc entry at all: really gone
+        }
+
+        // Field 2 (comm) is parenthesised and may itself contain ')' and spaces, so
+        // anchor on the LAST ')' rather than tokenising from the left.
+        const auto commEnd = line.rfind(')');
+        if (commEnd == std::string::npos || (commEnd + 2) >= line.size())
+        {
+            return false;
+        }
+
+        return line[commEnd + 2] != 'Z';
     }
 }

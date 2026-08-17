@@ -442,6 +442,7 @@ if (TF2BD_ENABLE_TESTS)
 		"Tests/EncodingTests.cpp"
 		"Tests/FormattingTests.cpp"
 		"Tests/HumanDurationTests.cpp"
+		"Tests/LinuxProcessTests.cpp"
 		"Tests/PathUtilsTests.cpp"
 		"Tests/ConfigSchemaInfoTests.cpp"
 		"Tests/PlayerRuleTests.cpp"
