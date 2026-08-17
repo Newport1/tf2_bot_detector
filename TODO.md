@@ -100,11 +100,32 @@ for the ones that turned out to be already resolved.
 
 ### P0
 
-- [ ] **Live-test the TF2-quit path.** Code side is done (below); this is the manual half.
-      Launch TF2 from TF2BD, quit TF2, confirm TF2BD returns to the launch button and releases
-      the RCON client rather than sitting on an empty player list. Also confirm the *launch*
-      path still works, since `IsTF2Running` now gates it on a process scan rather than a window.
-      Second pass worth doing: quit TF2BD first, then TF2, and compare.
+- [x] **Live-tested 2026-08-17, both orderings pass.** Run log
+      `build/tf2_bot_detector/logs/2026-08-17_12-43-33.log`.
+      - *No Steam:* two clean starts, `SteamID [I:0:0]` (invalid, Steam not logged in), graceful
+        shutdown both times. Steam dir and TF dir resolved correctly, TF2 on `E:\SteamLibrary`.
+      - *Launch path still works:* RCON `Connection established!` on socket 3048, console.log
+        opened from the external drive. That required `IsTF2Running()` true through the new
+        process scan — the path the window lookup used to serve.
+      - *Quit TF2, TF2BD running:* TF2 exited 12:44:58. RCON retried at 12:44:59, 12:45:06,
+        12:45:11, 12:45:16 — **four attempts, then it stopped**, versus the pre-fix Linux
+        behaviour of retrying every ~5s forever ("until we literally run out of ports",
+        surepy #25). The launch button came back: the relaunch at 12:45:00 was a real click,
+        confirmed by `auto_launch_tf2: false` in settings.json, so it was not the auto-launch
+        path firing.
+      - *Reverse, quit TF2BD with TF2 still up:* `Disconnecting Socket (656)` → `Graceful
+        shutdown` at 12:46:09, TF2 left running. Clean.
+      - The `forcibly closed` teardown burst is still exactly 8 lines, matching the previous
+        session — unchanged, still cosmetic.
+
+- [ ] **`DrawLaunchTF2Button` logs "TF2 already running!" and then launches anyway.**
+      `SetupFlow/TF2CommandLinePage.cpp:458` — `if (IsTF2Running()) LogError(...)` with no
+      `return` and no `else`, so it falls straight through to `OpenTF2`. The guard has never
+      guarded anything. It mattered less when `IsTF2Running` was a window-class lookup that
+      answered a different question; now that it is accurate, this is worth making real —
+      skip the launch and surface the reason via `m_Data.m_LaunchError` so the button does not
+      appear to do nothing. Deliberately not changed in the same pass as the fix above, so the
+      live test result stands against exactly what was tested.
 
 - [x] **`IsTF2Running` switched from a window lookup to a process scan.**
       Was `FindWindowA("Valve001", nullptr)` — a *window class* lookup, wrong in both directions:
@@ -158,7 +179,8 @@ for the ones that turned out to be already resolved.
 - Burst of `WSAECONNABORTED` at shutdown → teardown race, cosmetic only
 - `chat_*.log` / `console_*.log` read 0 bytes while the app holds the handle open (normal
   Windows behaviour; the size appears after exit)
-- Blank player entry during a session → the player had left or had not finished connecting
+- Blank player entry during a session → the player had left, had not finished connecting, or
+  (2026-08-17) the server was joined while it was already on the end-of-map vote
 
 ---
 
