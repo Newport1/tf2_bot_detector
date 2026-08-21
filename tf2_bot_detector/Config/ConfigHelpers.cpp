@@ -60,6 +60,16 @@ auto tf2_bot_detector::GetConfigFilePaths(const std::string_view& basename) -> C
 	return retVal;
 }
 
+bool tf2_bot_detector::detail::ShouldNormalizeConfigOnLoad(const std::filesystem::path& filename)
+{
+	static const std::regex thirdPartyFilenameRegex(
+		R"regex(^[^.]+\.(?!official).*\.json$)regex",
+		std::regex::optimize | std::regex::icase);
+
+	const auto name = filename.filename().string();
+	return !std::regex_match(name.begin(), name.end(), thirdPartyFilenameRegex);
+}
+
 static void SaveJSONToFile(const std::filesystem::path& filename, const nlohmann::json& json)
 {
 	IFilesystem::Get().WriteFile(filename, json.dump(1, '\t', true, nlohmann::detail::error_handler_t::ignore) << '\n', PathUsage::WriteRoaming);
@@ -93,10 +103,12 @@ static mh::task<bool> TryAutoUpdate(std::filesystem::path filename, const nlohma
 		co_return false;
 	}
 
+	std::string newFile;
 	nlohmann::json newJson;
 	try
 	{
-		newJson = nlohmann::json::parse(co_await client.GetStringAsync(info.m_UpdateURL));
+		newFile = co_await client.GetStringAsync(info.m_UpdateURL);
+		newJson = nlohmann::json::parse(newFile);
 	}
 	catch (...)
 	{
@@ -143,14 +155,34 @@ static mh::task<bool> TryAutoUpdate(std::filesystem::path filename, const nlohma
 		co_return false;
 	}
 
-	if (config.SaveFile(filename))
+	if (detail::ShouldNormalizeConfigOnLoad(filename))
 	{
-		LogError(MH_SOURCE_LOCATION_CURRENT(), "Successfully downloaded and deserialized new version of {} from {}, but couldn't write it back to disk.",
-			filename, info.m_UpdateURL);
+		if (config.SaveFile(filename))
+		{
+			LogError(MH_SOURCE_LOCATION_CURRENT(), "Successfully downloaded and deserialized new version of {} from {}, but couldn't write it back to disk.",
+				filename, info.m_UpdateURL);
+		}
+		else
+		{
+			DebugLog(MH_SOURCE_LOCATION_CURRENT(), "Wrote auto-updated config file from {} to {}", info.m_UpdateURL, filename);
+		}
 	}
 	else
 	{
-		DebugLog(MH_SOURCE_LOCATION_CURRENT(), "Wrote auto-updated config file from {} to {}", info.m_UpdateURL, filename);
+		try
+		{
+			// Third-party files are read-only inputs to TF2BD. Preserve the validated
+			// downloaded representation instead of serializing the in-memory model
+			// back to JSON, which is especially expensive for large player lists.
+			IFilesystem::Get().WriteFile(filename, newFile, PathUsage::WriteRoaming);
+			DebugLog(MH_SOURCE_LOCATION_CURRENT(), "Wrote auto-updated third-party config file from {} to {}", info.m_UpdateURL, filename);
+		}
+		catch (...)
+		{
+			LogException(MH_SOURCE_LOCATION_CURRENT(),
+				"Successfully downloaded and deserialized new version of {} from {}, but couldn't write it back to disk.",
+				filename, info.m_UpdateURL);
+		}
 	}
 
 	co_return true;
@@ -252,6 +284,12 @@ mh::task<std::error_condition> ConfigFileBase::LoadFileAsync(const std::filesyst
 	{
 		LogException("Failed to run PostLoad() for {}", filename);
 		co_return ConfigErrorType::PostLoadFailed;
+	}
+
+	if (!loadResult && !detail::ShouldNormalizeConfigOnLoad(filename))
+	{
+		DebugLog("Skipping normalization resave for third-party config file {}", filename);
+		co_return loadResult;
 	}
 
 	if (loadResult && loadResult != std::errc::no_such_file_or_directory) {
