@@ -31,13 +31,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh pr view 6 \
+          merged_at="$(gh pr view 6 \
             --repo "$GITHUB_REPOSITORY" \
             --json mergedAt \
-            --jq -e '.mergedAt != null' >/dev/null; then
+            --jq '.mergedAt // ""')"
+
+          if [ -z "$merged_at" ]; then
             echo "::error::PR #6 must be merged into custom before publishing v1.7.0.6."
             exit 1
           fi
+
+          echo "PR #6 merged at $merged_at"
 
       - name: Check whether release already exists
         id: release
