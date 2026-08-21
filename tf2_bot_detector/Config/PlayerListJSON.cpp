@@ -120,6 +120,17 @@ namespace tf2_bot_detector
 		d.m_Time = clock::time_point(seconds(j.at("time").get<seconds::rep>()));
 		d.m_PlayerName = j.value("player_name", "");
 	}
+
+	static void DeserializePlayerListDataFields(const nlohmann::json& j, PlayerListData& d)
+	{
+		d.m_SavedAttributes = j.at("attributes").get<PlayerAttributesList>();
+
+		if (auto lastSeen = j.find("last_seen"); lastSeen != j.end())
+			lastSeen->get_to(d.m_LastSeen.emplace());
+
+		try_get_to_defaulted(j, d.m_Proof, "proof");
+	}
+
 	void from_json(const nlohmann::json& j, PlayerListData& d) try
 	{
 		if (SteamID sid = j.at("steamid"); d.GetSteamID() != sid)
@@ -128,12 +139,7 @@ namespace tf2_bot_detector
 				<< d.GetSteamID() << ") and json SteamID (" << sid << ')');
 		}
 
-		d.m_SavedAttributes = j.at("attributes").get<PlayerAttributesList>();
-
-		if (auto lastSeen = j.find("last_seen"); lastSeen != j.end())
-			lastSeen->get_to(d.m_LastSeen.emplace());
-
-		try_get_to_defaulted(j, d.m_Proof, "proof");
+		DeserializePlayerListDataFields(j, d);
 	}
 	catch (...)
 	{
@@ -159,8 +165,27 @@ PlayerListJSON::PlayerListJSON(const Settings& settings) :
 	m_Settings(&settings),
 	m_CFGGroup(settings)
 {
-	// Immediately load and resave to normalize any formatting
+	// Immediately load config files; mutable lists may be normalized on load.
 	LoadFiles();
+}
+
+void tf2_bot_detector::detail::DeserializePlayerListEntries(const nlohmann::json& players, PlayerMap_t& map)
+{
+	for (const auto& player : players)
+	{
+		const SteamID steamID = player.at("steamid");
+		PlayerListData parsed(steamID);
+		DeserializePlayerListDataFields(player, parsed);
+		map.emplace(steamID, std::move(parsed));
+	}
+}
+
+size_t tf2_bot_detector::detail::CountThirdPartyPlayerListEntries(const ThirdPartyPlayerLists_t& lists)
+{
+	size_t count = 0;
+	for (const auto& file : lists)
+		count += file.second.size();
+	return count;
 }
 
 void PlayerListJSON::PlayerListFile::ValidateSchema(const ConfigSchemaInfo& schema) const
@@ -174,15 +199,7 @@ void PlayerListJSON::PlayerListFile::ValidateSchema(const ConfigSchemaInfo& sche
 void PlayerListJSON::PlayerListFile::Deserialize(const nlohmann::json& json)
 {
 	SharedConfigFileBase::Deserialize(json);
-
-	PlayerMap_t& map = m_Players;
-	for (const auto& player : json.at("players"))
-	{
-		const SteamID steamID = player.at("steamid");
-		PlayerListData parsed(steamID);
-		player.get_to(parsed);
-		map.emplace(steamID, std::move(parsed));
-	}
+	detail::DeserializePlayerListEntries(json.at("players"), m_Players);
 }
 
 void PlayerListJSON::PlayerListFile::Serialize(nlohmann::json& json) const
@@ -481,6 +498,25 @@ bool PlayerAttributesList::SetAttribute(PlayerAttribute attribute, bool set)
 void PlayerListJSON::ConfigFileGroup::CombineEntries(BaseClass::collection_type& map, const PlayerListFile& file) const
 {
 	map.push_back({ file.GetName(), file.m_Players });
+}
+
+void PlayerListJSON::ConfigFileGroup::CombineEntries(BaseClass::collection_type& map, PlayerListFile&& file) const
+{
+	map.emplace_back(file.GetName(), std::move(file.m_Players));
+}
+
+size_t PlayerListJSON::ConfigFileGroup::size() const
+{
+	size_t retVal = 0;
+
+	if (auto list = m_OfficialList.try_get())
+		retVal += list->size();
+	if (m_UserList)
+		retVal += m_UserList->size();
+	if (auto lists = m_ThirdPartyLists.try_get())
+		retVal += detail::CountThirdPartyPlayerListEntries(*lists);
+
+	return retVal;
 }
 
 bool PlayerMarks::Has(const PlayerAttributesList& attr) const
