@@ -422,6 +422,11 @@ PlayerListData::PlayerListData(const SteamID& id) :
 {
 }
 
+PlayerListData::PlayerListData(const PlayerListData&) = default;
+PlayerListData& PlayerListData::operator=(const PlayerListData&) = default;
+PlayerListData::PlayerListData(PlayerListData&&) noexcept = default;
+PlayerListData& PlayerListData::operator=(PlayerListData&&) noexcept = default;
+
 PlayerListData::~PlayerListData()
 {
 }
