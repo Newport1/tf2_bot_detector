@@ -84,6 +84,10 @@ namespace tf2_bot_detector
 	struct PlayerListData
 	{
 		PlayerListData(const SteamID& id);
+		PlayerListData(const PlayerListData&);
+		PlayerListData& operator=(const PlayerListData&);
+		PlayerListData(PlayerListData&&) noexcept;
+		PlayerListData& operator=(PlayerListData&&) noexcept;
 		~PlayerListData();
 
 		constexpr SteamID GetSteamID() const { return m_SteamID; }
@@ -296,7 +300,7 @@ struct fmt::formatter<tf2_bot_detector::PlayerMarks, CharT>
 	{
 		auto it = ctx.out();
 
-		for (auto& mark : marks.m_Marks)
+		for (auto& mark : marks)
 			it = fmt::format_to(it, FMT_STRING("\n\t - {}"), mark);
 
 		return it;
