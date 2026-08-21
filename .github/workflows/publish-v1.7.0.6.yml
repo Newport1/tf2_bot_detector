@@ -1,0 +1,141 @@
+name: Publish v1.7.0.6 release
+
+on:
+  push:
+    branches:
+      - custom
+    paths:
+      - ".github/workflows/publish-v1.7.0.6.yml"
+      - ".github/release-notes/v1.7.0.6.md"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: read
+
+env:
+  TAG: v1.7.0.6
+  WINDOWS_RUN_ID: "32505579827"
+  LINUX_RUN_ID: "32505579818"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Require PR #6 to be merged
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh pr view 6 \
+            --repo "$GITHUB_REPOSITORY" \
+            --json mergedAt \
+            --jq -e '.mergedAt != null' >/dev/null; then
+            echo "::error::PR #6 must be merged into custom before publishing v1.7.0.6."
+            exit 1
+          fi
+
+      - name: Check whether release already exists
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists; leaving it unchanged."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download successful 1.7.0.6 build artifacts
+        if: steps.release.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p work/windows-x64 work/windows-x86 work/linux-appimage work/linux-portable dist
+
+          gh run download "$WINDOWS_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "tf2-bot-detector_windows-2022_x64-windows_1.7.0.6_Release" \
+            --dir work/windows-x64
+
+          gh run download "$WINDOWS_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "tf2-bot-detector_windows-2022_x86-windows_1.7.0.6_Release" \
+            --dir work/windows-x86
+
+          gh run download "$LINUX_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "tf2-bot-detector_appimage_x64-ubuntu_1.7.0.6_Release" \
+            --dir work/linux-appimage
+
+          gh run download "$LINUX_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "tf2-bot-detector_ubuntu-latest_x64-ubuntu_1.7.0.6_Release" \
+            --dir work/linux-portable
+
+      - name: Package release downloads
+        if: steps.release.outputs.exists != 'true'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          dist = Path("dist")
+          dist.mkdir(exist_ok=True)
+
+          shutil.make_archive(
+              str(dist / "tf2-bot-detector_windows-x64_1.7.0.6"),
+              "zip",
+              "work/windows-x64",
+          )
+          shutil.make_archive(
+              str(dist / "tf2-bot-detector_windows-x86_1.7.0.6"),
+              "zip",
+              "work/windows-x86",
+          )
+          shutil.make_archive(
+              str(dist / "tf2-bot-detector_linux-x86_64_1.7.0.6"),
+              "zip",
+              "work/linux-portable",
+          )
+
+          src = Path("work/linux-appimage/tf2_bot_detector-x86_64.AppImage")
+          dst = dist / "tf2-bot-detector_linux-x86_64_1.7.0.6.AppImage"
+          if not src.is_file():
+              raise SystemExit(f"Missing expected AppImage: {src}")
+          shutil.copy2(src, dst)
+          PY
+
+          chmod +x dist/tf2-bot-detector_linux-x86_64_1.7.0.6.AppImage
+
+          (
+            cd dist
+            sha256sum \
+              tf2-bot-detector_windows-x64_1.7.0.6.zip \
+              tf2-bot-detector_windows-x86_1.7.0.6.zip \
+              tf2-bot-detector_linux-x86_64_1.7.0.6.AppImage \
+              tf2-bot-detector_linux-x86_64_1.7.0.6.zip \
+              > SHA256SUMS.txt
+          )
+
+      - name: Publish GitHub release
+        if: steps.release.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "TF2 Bot Detector 1.7.0.6 — Community Revival Build" \
+            --notes-file .github/release-notes/v1.7.0.6.md \
+            --prerelease \
+            dist/tf2-bot-detector_windows-x64_1.7.0.6.zip \
+            dist/tf2-bot-detector_windows-x86_1.7.0.6.zip \
+            dist/tf2-bot-detector_linux-x86_64_1.7.0.6.AppImage \
+            dist/tf2-bot-detector_linux-x86_64_1.7.0.6.zip \
+            dist/SHA256SUMS.txt
