@@ -14,6 +14,7 @@
 #include <cassert>
 #include <filesystem>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace tf2_bot_detector
@@ -127,6 +128,7 @@ namespace tf2_bot_detector
 
 	namespace detail
 	{
+		bool ShouldNormalizeConfigOnLoad(const std::filesystem::path& filename);
 		mh::task<std::error_condition> LoadConfigFileAsync(ConfigFileBase& file, std::filesystem::path filename, bool allowAutoUpdate, const Settings& settings);
 	}
 
@@ -148,6 +150,10 @@ namespace tf2_bot_detector
 		virtual ~ConfigFileGroupBase() = default;
 
 		virtual void CombineEntries(collection_type& collection, const T& file) const = 0;
+		virtual void CombineEntries(collection_type& collection, T&& file) const
+		{
+			CombineEntries(collection, file);
+		}
 		virtual std::string GetBaseFileName() const = 0;
 
 		void LoadFiles()
@@ -257,7 +263,7 @@ namespace tf2_bot_detector
 				try
 				{
 					auto parsedFile = co_await LoadConfigFileAsync<T>(file, true, *m_Settings);
-					CombineEntries(collection, parsedFile);
+					CombineEntries(collection, std::move(parsedFile));
 				}
 				catch (...)
 				{

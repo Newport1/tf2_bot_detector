@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <map>
 #include <optional>
+#include <vector>
 
 namespace tf2_bot_detector
 {
@@ -83,6 +84,10 @@ namespace tf2_bot_detector
 	struct PlayerListData
 	{
 		PlayerListData(const SteamID& id);
+		PlayerListData(const PlayerListData&);
+		PlayerListData& operator=(const PlayerListData&);
+		PlayerListData(PlayerListData&&) noexcept;
+		PlayerListData& operator=(PlayerListData&&) noexcept;
 		~PlayerListData();
 
 		constexpr SteamID GetSteamID() const { return m_SteamID; }
@@ -141,6 +146,15 @@ namespace tf2_bot_detector
 	*/
 
 	using ConfigFileName = std::string;
+	using PlayerMap_t = std::map<SteamID, PlayerListData>;
+	using ThirdPartyPlayerLists_t = std::vector<std::pair<ConfigFileName, PlayerMap_t>>;
+
+	namespace detail
+	{
+		void DeserializePlayerListEntries(const nlohmann::json& players, PlayerMap_t& map);
+		size_t CountThirdPartyPlayerListEntries(const ThirdPartyPlayerLists_t& lists);
+	}
+
 	struct PlayerMarks final
 	{
 		struct Mark final
@@ -193,8 +207,6 @@ namespace tf2_bot_detector
 
 		ModifyPlayerAction OnPlayerDataChanged(PlayerListData& data);
 
-		using PlayerMap_t = std::map<SteamID, PlayerListData>;
-
 		struct PlayerListFile final : public SharedConfigFileBase
 		{
 			void ValidateSchema(const ConfigSchemaInfo& schema) const override;
@@ -210,13 +222,15 @@ namespace tf2_bot_detector
 
 		static constexpr int PLAYERLIST_SCHEMA_VERSION = 3;
 
-		struct ConfigFileGroup final : public ConfigFileGroupBase<PlayerListFile, std::vector<std::pair<ConfigFileName, PlayerMap_t>>>
+		struct ConfigFileGroup final : public ConfigFileGroupBase<PlayerListFile, ThirdPartyPlayerLists_t>
 		{
 			using BaseClass = ConfigFileGroupBase;
 
 			using ConfigFileGroupBase::ConfigFileGroupBase;
 			void CombineEntries(BaseClass::collection_type& map, const PlayerListFile& file) const override;
+			void CombineEntries(BaseClass::collection_type& map, PlayerListFile&& file) const override;
 			std::string GetBaseFileName() const override { return "playerlist"; }
+			size_t size() const;
 
 		} m_CFGGroup;
 
