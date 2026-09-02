@@ -83,8 +83,15 @@ void Filesystem::Init()
 				DebugLog("m_ExeDir differs from working directory!", m_ExeDir);
 
 				// create cfg inside Team Fortress 2 folder (cuz why not)
-				if (std::filesystem::create_directories("cfg"))
+				std::error_code ecCreateCfg;
+				if (std::filesystem::create_directories("cfg", ecCreateCfg))
+				{
 					DebugLog("Created {}/cfg", m_ExeDir);
+				}
+				else if (ecCreateCfg)
+				{
+					DebugLog("Failed to create cfg directory: {}", ecCreateCfg.message());
+				}
 
 				// NOTE: this may create a kind of nasty unintended behavior where if a setting.json or something is in that directory,
 				// it will have a higher priority and just wipe the other one.
@@ -94,16 +101,22 @@ void Filesystem::Init()
 
 			// we've launched somewhere that differs from PATH, we should probably change back to our exedir cuz that's where we work.
 			//  || !(m_WorkingDir / "hl2.exe").empty() || !(m_WorkingDir / "hl2_linux").empty()
+			std::error_code ecExists;
 #ifdef _WIN32
-			if ((m_WorkingDir / "tf2_bot_detector.dll").empty())
+			const bool exists = std::filesystem::exists(m_WorkingDir / "tf2_bot_detector.dll", ecExists);
 #else
-			if ((m_WorkingDir / "tf2_bot_detector").empty())
+			const bool exists = std::filesystem::exists(m_WorkingDir / "tf2_bot_detector", ecExists);
 #endif
+			if (ecExists || !exists)
 			{
 				DebugLog("We can't find tf2_bot_detector.dll in m_WorkingDir!", m_ExeDir);
 				// If we crash, we want our working directory to be somewhere we can write to.
-				std::filesystem::current_path(m_ExeDir);
-				DebugLog("Set working directory to {}", m_ExeDir);
+				std::error_code ecCurrentPath;
+				std::filesystem::current_path(m_ExeDir, ecCurrentPath);
+				if (ecCurrentPath)
+					DebugLog("Failed to set working directory to {}: {}", m_ExeDir, ecCurrentPath.message());
+				else
+					DebugLog("Set working directory to {}", m_ExeDir);
 			}
 
 			{
