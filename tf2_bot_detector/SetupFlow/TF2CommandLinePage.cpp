@@ -456,7 +456,11 @@ void TF2CommandLinePage::DrawLaunchTF2Button(const DrawState& ds)
 			if ((ImGui::Button("Launch TF2") || (m_IsAutoLaunchAllowed && ds.m_Settings->m_AutoLaunchTF2)) && canLaunchTF2)
 			{
 				if (Platform::Processes::IsTF2Running())
+				{
 					LogError("TF2 already running!");
+					m_Data.m_LaunchError = "TF2 is already running. Please close it before launching again.";
+					return;
+				}
 
 				if (ds.m_Settings->m_UseRconStaticParams) {
 					m_Data.m_RandomRCONPassword = ds.m_Settings->m_RconStaticPassword;
