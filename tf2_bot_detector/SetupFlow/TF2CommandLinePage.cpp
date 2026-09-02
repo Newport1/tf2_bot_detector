@@ -459,6 +459,7 @@ void TF2CommandLinePage::DrawLaunchTF2Button(const DrawState& ds)
 				{
 					LogError("TF2 already running!");
 					m_Data.m_LaunchError = "TF2 is already running. Please close it before launching again.";
+					m_IsAutoLaunchAllowed = false;
 					return;
 				}
 
