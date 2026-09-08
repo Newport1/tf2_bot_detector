@@ -245,6 +245,9 @@ namespace
 								auto newver = tf2_bot_detector::GithubAPI::CheckForNewVersion(*sharedClient);
 								tf2_bot_detector::GithubAPI::NewVersionResult result = newver.get();
 
+								if (result.IsError())
+									throw std::runtime_error("Failed to check for updates via GitHub API.");
+
 								BuildInfo ret;
 
 								// new stable release
