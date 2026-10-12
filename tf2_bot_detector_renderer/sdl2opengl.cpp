@@ -27,6 +27,8 @@ static std::string version_string = fmt::format(FMT_COMPILE("TF2 Bot Detector v{
 
 TF2BotDetectorSDLRenderer::TF2BotDetectorSDLRenderer() : TF2BotDetectorRendererBase()
 {
+	// A background utility should not prevent the OS from turning off the display.
+	SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
 	// Setup SDL
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
 	{
