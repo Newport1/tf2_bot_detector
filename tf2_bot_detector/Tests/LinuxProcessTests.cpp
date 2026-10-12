@@ -58,4 +58,49 @@ TEST_CASE("IsProcessRunningPid - self is running, -1 is not", "[tf2bd][linux][pr
 	CHECK_FALSE(Linux::IsProcessRunningPid(-1));
 }
 
+TEST_CASE("getPidFromProcessName - exact executable name matching", "[tf2bd][linux][process]")
+{
+	const pid_t wrapperChild = fork();
+	REQUIRE(wrapperChild != -1);
+
+	if (wrapperChild == 0)
+	{
+		execlp("sleep", "sleep", "60", "--wrapper-target=tf_linux64", nullptr);
+		_exit(1);
+	}
+
+	const std::string sleepSrc = std::filesystem::exists("/bin/sleep") ? "/bin/sleep" : "/usr/bin/sleep";
+	const std::string uniqueTargetName = "tf2bd_test_target_" + std::to_string(getpid());
+	const auto tempExePath = std::filesystem::temp_directory_path() / uniqueTargetName;
+
+	std::error_code ec;
+	std::filesystem::copy_file(sleepSrc, tempExePath, std::filesystem::copy_options::overwrite_existing, ec);
+	REQUIRE_FALSE(ec);
+	std::filesystem::permissions(tempExePath, std::filesystem::perms::owner_all, ec);
+
+	const pid_t targetChild = fork();
+	REQUIRE(targetChild != -1);
+
+	if (targetChild == 0)
+	{
+		execl(tempExePath.c_str(), tempExePath.c_str(), "60", nullptr);
+		_exit(1);
+	}
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+	CHECK(Linux::getPidFromProcessName("tf_linux64") != wrapperChild);
+	CHECK(Linux::getPidFromProcessName(uniqueTargetName) == targetChild);
+
+	kill(wrapperChild, SIGKILL);
+	int status1 = 0;
+	waitpid(wrapperChild, &status1, 0);
+
+	kill(targetChild, SIGKILL);
+	int status2 = 0;
+	waitpid(targetChild, &status2, 0);
+
+	std::filesystem::remove(tempExePath, ec);
+}
+
 #endif

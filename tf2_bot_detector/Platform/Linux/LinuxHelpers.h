@@ -17,9 +17,9 @@ namespace tf2_bot_detector::Linux
     // PID cache
     inline std::unordered_map<std::string_view, pid_t> processPids;
 
-    // chatgpt generated code cuz lazy
     inline pid_t getPidFromProcessName(const std::string &processName)
     {
+        const pid_t selfPid = ::getpid();
         DIR *dir = opendir("/proc");
         if (dir != nullptr)
         {
@@ -29,21 +29,37 @@ namespace tf2_bot_detector::Linux
                 // Check if the entry is a directory and its name is a number (PID)
                 if (entry->d_type == DT_DIR && std::isdigit(entry->d_name[0]))
                 {
-                    // Open the cmdline file to read the process name
-                    std::filesystem::path cmdlinePath = std::filesystem::current_path().root_directory() / "proc" / entry->d_name / "cmdline";
-                    FILE *cmdlineFile = fopen(cmdlinePath.c_str(), "r");
-                    if (cmdlineFile != nullptr)
-                    {
-                        char cmdline[1024];
-                        fgets(cmdline, sizeof(cmdline), cmdlineFile);
-                        fclose(cmdlineFile);
+                    const pid_t pid = atoi(entry->d_name);
+                    if (pid == selfPid)
+                        continue;
 
-                        // Compare the process name with the given name
-                        if (strstr(cmdline, processName.c_str()) != nullptr)
+                    std::string matchedName;
+                    std::error_code ec;
+                    std::filesystem::path exePath = std::filesystem::read_symlink(
+                        std::filesystem::path("/proc") / entry->d_name / "exe", ec);
+
+                    if (!ec && !exePath.empty())
+                    {
+                        matchedName = exePath.filename().string();
+                    }
+                    else
+                    {
+                        std::ifstream cmdlineFile(std::filesystem::path("/proc") / entry->d_name / "cmdline", std::ios::binary);
+                        if (cmdlineFile.is_open())
                         {
-                            closedir(dir);
-                            return atoi(entry->d_name); // Convert directory name to PID
+                            std::string argv0;
+                            std::getline(cmdlineFile, argv0, '\0');
+                            if (!argv0.empty())
+                            {
+                                matchedName = std::filesystem::path(argv0).filename().string();
+                            }
                         }
+                    }
+
+                    if (matchedName == processName)
+                    {
+                        closedir(dir);
+                        return pid;
                     }
                 }
             }
