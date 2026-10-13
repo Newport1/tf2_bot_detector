@@ -4,13 +4,73 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <string>
 #include <thread>
 
 using namespace tf2_bot_detector;
+
+namespace
+{
+	struct ProcessFixture
+	{
+		pid_t wrapper = -1;
+		pid_t target = -1;
+		int holdFd = -1;
+		std::filesystem::path copiedExe;
+
+		~ProcessFixture()
+		{
+			if (holdFd >= 0)
+				close(holdFd);
+
+			for (const pid_t pid : { wrapper, target })
+			{
+				if (pid <= 0)
+					continue;
+
+				kill(pid, SIGKILL);
+				int status = 0;
+				waitpid(pid, &status, 0);
+			}
+
+			std::error_code ec;
+			if (!copiedExe.empty())
+				std::filesystem::remove(copiedExe, ec);
+		}
+	};
+
+	std::string ReadProcCmdline(pid_t pid)
+	{
+		std::ifstream file(std::filesystem::path("/proc") / std::to_string(pid) / "cmdline", std::ios::binary);
+		return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+	}
+
+	bool ExeBasenameIs(pid_t pid, const std::string& name)
+	{
+		std::error_code ec;
+		const auto exe = std::filesystem::read_symlink(
+			std::filesystem::path("/proc") / std::to_string(pid) / "exe", ec);
+		return !ec && exe.filename() == name;
+	}
+
+	// Exec is asynchronous. A fixed sleep both flakes and, when the child has
+	// already exited, observes an empty /proc/<pid>/cmdline.
+	template <typename Pred>
+	bool PollUntil(Pred&& pred)
+	{
+		for (int i = 0; i < 200 && !pred(); ++i)
+			std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		return pred();
+	}
+}
 
 // The bug this guards against: kill(pid, 0) succeeds for a zombie, so quitting TF2
 // left IsTF2Running() true forever -- the RCON client was never released and the UI
@@ -58,49 +118,77 @@ TEST_CASE("IsProcessRunningPid - self is running, -1 is not", "[tf2bd][linux][pr
 	CHECK_FALSE(Linux::IsProcessRunningPid(-1));
 }
 
+// The old scan was strstr() over /proc/<pid>/cmdline. fgets() keeps embedded
+// NULs, but strstr() stops at the first one, so a wrapper whose argv0 merely
+// contains "tf_linux64" was treated as the game. GNU sleep rejects
+// "--wrapper-target=..." and exits, leaving a zombie with an empty cmdline, so
+// that assertion passed without the wrapper still being visible. sh stays
+// blocked in `read` with the marker on its cmdline until we close the pipe.
 TEST_CASE("getPidFromProcessName - exact executable name matching", "[tf2bd][linux][process]")
 {
-	const pid_t wrapperChild = fork();
-	REQUIRE(wrapperChild != -1);
+	constexpr const char* kWrapperMarker = "--wrapper-target=tf_linux64";
 
-	if (wrapperChild == 0)
+	int pipefd[2] = { -1, -1 };
+	REQUIRE(pipe(pipefd) == 0);
+
+	ProcessFixture procs;
+	procs.holdFd = pipefd[1];
+	procs.wrapper = fork();
+	if (procs.wrapper == 0)
 	{
-		execlp("sleep", "sleep", "60", "--wrapper-target=tf_linux64", nullptr);
+		close(pipefd[1]);
+		if (dup2(pipefd[0], STDIN_FILENO) < 0)
+			_exit(1);
+		close(pipefd[0]);
+
+		// argv0 contains "tf_linux64" so the old strstr() scan (which stops at
+		// the first NUL) matches this wrapper. A leading '-' would make sh a
+		// login shell, so the marker flag itself is a later argument. `read`
+		// is a shell builtin and blocks while the pipe's write end stays open.
+		execlp("sh", "tf_linux64-wrapper", "-c", "read _", "sh", kWrapperMarker, nullptr);
 		_exit(1);
 	}
+	close(pipefd[0]);
+	REQUIRE(procs.wrapper != -1);
+	// Drop the write end on exec so the copied sleep does not keep `read` alive
+	// after this fixture closes holdFd.
+	REQUIRE(fcntl(procs.holdFd, F_SETFD, FD_CLOEXEC) != -1);
 
 	const std::string sleepSrc = std::filesystem::exists("/bin/sleep") ? "/bin/sleep" : "/usr/bin/sleep";
 	const std::string uniqueTargetName = "tf2bd_test_target_" + std::to_string(getpid());
-	const auto tempExePath = std::filesystem::temp_directory_path() / uniqueTargetName;
+	procs.copiedExe = std::filesystem::temp_directory_path() / uniqueTargetName;
 
 	std::error_code ec;
-	std::filesystem::copy_file(sleepSrc, tempExePath, std::filesystem::copy_options::overwrite_existing, ec);
+	std::filesystem::copy_file(sleepSrc, procs.copiedExe, std::filesystem::copy_options::overwrite_existing, ec);
 	REQUIRE_FALSE(ec);
-	std::filesystem::permissions(tempExePath, std::filesystem::perms::owner_all, ec);
+	std::filesystem::permissions(procs.copiedExe, std::filesystem::perms::owner_all, ec);
 
-	const pid_t targetChild = fork();
-	REQUIRE(targetChild != -1);
-
-	if (targetChild == 0)
+	procs.target = fork();
+	if (procs.target == 0)
 	{
-		execl(tempExePath.c_str(), tempExePath.c_str(), "60", nullptr);
+		execl(procs.copiedExe.c_str(), procs.copiedExe.c_str(), "60", nullptr);
 		_exit(1);
 	}
+	REQUIRE(procs.target != -1);
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(50));
+	INFO("wrapper cmdline was not observable");
+	REQUIRE(PollUntil([&] {
+		return Linux::IsProcessRunningPid(procs.wrapper)
+			&& ReadProcCmdline(procs.wrapper).find(kWrapperMarker) != std::string::npos;
+	}));
 
-	CHECK(Linux::getPidFromProcessName("tf_linux64") != wrapperChild);
-	CHECK(Linux::getPidFromProcessName(uniqueTargetName) == targetChild);
+	INFO("target executable was not observable");
+	REQUIRE(PollUntil([&] {
+		return Linux::IsProcessRunningPid(procs.target)
+			&& ExeBasenameIs(procs.target, uniqueTargetName);
+	}));
 
-	kill(wrapperChild, SIGKILL);
-	int status1 = 0;
-	waitpid(wrapperChild, &status1, 0);
+	const pid_t foundGame = Linux::getPidFromProcessName("tf_linux64");
+	CHECK(foundGame != procs.wrapper);
+	if (foundGame != -1)
+		CHECK(ExeBasenameIs(foundGame, "tf_linux64"));
 
-	kill(targetChild, SIGKILL);
-	int status2 = 0;
-	waitpid(targetChild, &status2, 0);
-
-	std::filesystem::remove(tempExePath, ec);
+	CHECK(Linux::getPidFromProcessName(uniqueTargetName) == procs.target);
 }
 
 #endif
