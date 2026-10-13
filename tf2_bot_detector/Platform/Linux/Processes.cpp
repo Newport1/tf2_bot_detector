@@ -56,7 +56,7 @@ bool tf2_bot_detector::Processes::IsProcessRunning(const std::string_view& proce
         pid = Linux::processPids.at(processName);
     }
     else {
-        pid = Linux::getPidFromProcessName(std::string(processName));
+        pid = Linux::getPidFromProcessName();
         Linux::processPids.insert(std::pair<std::string_view, pid_t>(processName, pid));
     }
 

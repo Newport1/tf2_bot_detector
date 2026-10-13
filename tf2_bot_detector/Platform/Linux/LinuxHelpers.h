@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <filesystem>
 
+#include "Util/PathUtils.h"
+
 #include <unistd.h>
 #include <dirent.h>
 #include <signal.h>
@@ -17,8 +19,16 @@ namespace tf2_bot_detector::Linux
     // PID cache
     inline std::unordered_map<std::string_view, pid_t> processPids;
 
-    // chatgpt generated code cuz lazy
-    inline pid_t getPidFromProcessName(const std::string &processName)
+    // Find the PID of a running TF2 game process.
+    //
+    // Matches the executable basename (argv[0] of /proc/<pid>/cmdline) exactly
+    // against TF2ProcessNames(), instead of substring-matching the whole
+    // cmdline. The old strstr() check had false positives: the tf.sh launch
+    // wrapper, and any process whose argv merely mentioned a game binary name,
+    // would match -- and GetTF2CommandLineArgsAsync could then latch onto the
+    // wrapper pid instead of the game. See the kTF2ProcessNames comment in
+    // PathUtils.cpp.
+    inline pid_t getPidFromProcessName()
     {
         DIR *dir = opendir("/proc");
         if (dir != nullptr)
@@ -29,27 +39,32 @@ namespace tf2_bot_detector::Linux
                 // Check if the entry is a directory and its name is a number (PID)
                 if (entry->d_type == DT_DIR && std::isdigit(entry->d_name[0]))
                 {
-                    // Open the cmdline file to read the process name
-                    std::filesystem::path cmdlinePath = std::filesystem::current_path().root_directory() / "proc" / entry->d_name / "cmdline";
-                    FILE *cmdlineFile = fopen(cmdlinePath.c_str(), "r");
-                    if (cmdlineFile != nullptr)
+                    // argv[0] of /proc/<pid>/cmdline is the executable the process
+                    // was started with; its basename is what TF2ProcessNames()
+                    // lists (e.g. tf_linux64), never the tf.sh wrapper.
+                    const std::filesystem::path cmdlinePath =
+                        std::filesystem::path("/proc") / entry->d_name / "cmdline";
+                    std::ifstream cmdlineFile(cmdlinePath, std::ios::binary);
+                    std::string argv0;
+                    if (cmdlineFile && std::getline(cmdlineFile, argv0, '\0'))
                     {
-                        char cmdline[1024];
-                        fgets(cmdline, sizeof(cmdline), cmdlineFile);
-                        fclose(cmdlineFile);
+                        const std::string basename =
+                            std::filesystem::path(argv0).filename().string();
 
-                        // Compare the process name with the given name
-                        if (strstr(cmdline, processName.c_str()) != nullptr)
+                        for (const auto name : TF2ProcessNames())
                         {
-                            closedir(dir);
-                            return atoi(entry->d_name); // Convert directory name to PID
+                            if (basename == name)
+                            {
+                                closedir(dir);
+                                return atoi(entry->d_name); // Convert directory name to PID
+                            }
                         }
                     }
                 }
             }
             closedir(dir);
         }
-        return -1; // Return -1 if the process name is not found
+        return -1; // Return -1 if no TF2 process was found
     }
 
     // if you dont have ~/.steam/steam.pid, this will fail
